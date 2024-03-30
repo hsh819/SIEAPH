@@ -20,7 +20,7 @@
 # For this reason, we recommend only including the same terms included in the propensity score model unless there is a strong a priori and justifiable reason to model the outcome differently.
 
 
-########################################UMAP降维######################################################
+########################################UMAP######################################################
 # Uniform Manifold Approximation and Projection (UMAP) is an algorithm for dimension reduction based on manifold learning techniques and ideas from topological data analysis. 
 # It provides a very general framework for approaching manifold learning and dimension reduction, but can also provide specific concrete realizations.
 
@@ -35,7 +35,7 @@
 
 compute_min_MMD = function(x, is.synthetic=TRUE, interval=1) {
 
-	if(is.numeric(x)) {  # 模拟数据
+	if(is.numeric(x)) {  # Simulated data
 		if((x + 99) %% interval == 0) {
 			if(is.synthetic) {
 				set.seed(x + 99) 
@@ -61,7 +61,7 @@ compute_min_MMD = function(x, is.synthetic=TRUE, interval=1) {
 		
 			return(M)	
 		}			
-	} else if(is.data.frame(x) | is.matrix(x)) {  # 真实数据
+	} else if(is.data.frame(x) | is.matrix(x)) {  # Real data
 		dat = x
 		N = ncol(dat) - 2
 		XC = dat[dat$T == 0, 1:N]
@@ -94,9 +94,9 @@ mul_kdrm = function(dat, d, iter=1, replace=TRUE, MMD=list(), interval=1, num=5)
 	XC = dat[dat$T == 0, 1:N]
 	XT = dat[dat$T == 1, 1:N]
 	
-	if(is.logical(iter)) {  # 真实数据
+	if(is.logical(iter)) {  # Real data
 		M = MMD
-	} else {  # 模拟数据
+	} else {  # Simulated data
 		k = ceiling(iter / interval)
 		M = MMD[[k]]	
 	}
@@ -109,16 +109,16 @@ mul_kdrm = function(dat, d, iter=1, replace=TRUE, MMD=list(), interval=1, num=5)
 	Xdist = 2 * (1 - kernel$kernel_val/num)
 #	Xdist = sqrt(Xdist)
 	
-	if(is.logical(iter) == FALSE & replace == TRUE) {  # 模拟数据，重复匹配
+	if(is.logical(iter) == FALSE & replace == TRUE) {  # Simulated data, repeated matching
 		n_neighbors = c(18, 20, 22) # c(16, 18, 20, 22, 24)
 		min_dist = c(0.10, 0.30, 0.50) # c(0.10, 0.30, 0.50)		
-	} else if(is.logical(iter) == FALSE & replace == FALSE) {  # 模拟数据，不重复匹配
+	} else if(is.logical(iter) == FALSE & replace == FALSE) {  # Simulated data, non-repeated matching
 		n_neighbors = c(5, 15, 25)  # c(12, 15, 35)
 		min_dist = c(0.10) 		
-	} else if(is.logical(iter) == TRUE & replace == TRUE) {  # 真实数据，重复匹配
+	} else if(is.logical(iter) == TRUE & replace == TRUE) {  # Real data, repeated matching
 		n_neighbors = c(10, 18, 22)  # Lalonde: c(10, 18, 22)/c(5, 18, 22)  Air pollution: 
 		min_dist = c(0.10)	# LaLonde: c(0.10)  Air pollution:	
-	} else {  # 真实数据，不重复匹配
+	} else {  # Real data, non-repeated matching
 		n_neighbors = c(10, 18, 25)  # LaLonde: c(10, 18, 25)/c(5, 18, 25)  Air pollution: c(10, 18, 22), c(10, 16, 22)
 		min_dist = c(0.10)	# LaLonde: c(0.10)/c(0.01, 0.10, 0.20)  Air pollution: c(0.10)
 	}
@@ -138,13 +138,13 @@ mul_kdrm = function(dat, d, iter=1, replace=TRUE, MMD=list(), interval=1, num=5)
 		  return(layout)		 
 	  })
 	})
-	future::plan(future::sequential)  # 关闭进程
+	future::plan(future::sequential)  # Close process
 	
 	return(res)
 }
 
 
-########################################ATT计算函数######################################################
+########################################ATT calculation function######################################################
 
 euc_ATT = function(dat, replace=TRUE, formula.select=1, is.m=FALSE) {
 	if(formula.select == 1) {
@@ -177,22 +177,22 @@ euc_ATT = function(dat, replace=TRUE, formula.select=1, is.m=FALSE) {
 	# Estimating Treatment Effects
 	if(replace) {
 		m.data = get_matches(m)
-		if(length(unique(dat$Y)) != 2)  # 连续响应变量
+		if(length(unique(dat$Y)) != 2)  # continuous response
 		{
 			fit = lm(formula2, data = m.data, weights = weights)
 			ATT = avg_comparisons(fit, variables = "T", vcov = ~ subclass + id, newdata = subset(m.data, T == 1), wts = "weights")				
-		} else {  # 二分类响应变量
+		} else {  # binary response
 			fit = glm(formula2, data = m.data, weights = weights, family = quasibinomial())
 			ATT_lnRR = avg_comparisons(fit, variables = "T", vcov = ~ subclass + id, newdata = subset(m.data, T == 1), wts = "weights", comparison = "lnratioavg")  # transform = "exp", logRR					
 			ATT_lnOR = avg_comparisons(fit, variables = "T", vcov = ~ subclass + id, newdata = subset(m.data, T == 1), wts = "weights", comparison = "lnoravg")  # logOR					
 		}	
 	} else {
 		m.data = match.data(m)
-		if(length(unique(dat$Y)) != 2)  # 连续响应变量
+		if(length(unique(dat$Y)) != 2)  # continuous response
 		{
 			fit = lm(formula2, data = m.data, weights = weights)
 			ATT = avg_comparisons(fit, variables = "T", vcov = ~ subclass, newdata = subset(m.data, T == 1), wts = "weights")				
-		} else {  # 二分类响应变量
+		} else {  # binary response
 			fit = glm(formula2, data = m.data, weights = weights, family = quasibinomial())
 			ATT_lnRR = avg_comparisons(fit, variables = "T", vcov = ~ subclass, newdata = subset(m.data, T == 1), wts = "weights", comparison = "lnratioavg")  # transform = "exp", logRR	
 			ATT_lnOR = avg_comparisons(fit, variables = "T", vcov = ~ subclass, newdata = subset(m.data, T == 1), wts = "weights", comparison = "lnoravg")  # logOR			
@@ -246,22 +246,22 @@ mah_ATT = function(dat, replace=TRUE, formula.select=1, is.m=FALSE) {
 	# Estimating Treatment Effects
 	if(replace) {
 		m.data = get_matches(m)
-		if(length(unique(dat$Y)) != 2)  # 连续响应变量
+		if(length(unique(dat$Y)) != 2)  # continuous response
 		{
 			fit = lm(formula2, data = m.data, weights = weights)
 			ATT = avg_comparisons(fit, variables = "T", vcov = ~ subclass + id, newdata = subset(m.data, T == 1), wts = "weights")				
-		} else {  # 二分类响应变量
+		} else {  # binary response
 			fit = glm(formula2, data = m.data, weights = weights, family = quasibinomial())
 			ATT_lnRR = avg_comparisons(fit, variables = "T", vcov = ~ subclass + id, newdata = subset(m.data, T == 1), wts = "weights", comparison = "lnratioavg")  # transform = "exp", logRR					
 			ATT_lnOR = avg_comparisons(fit, variables = "T", vcov = ~ subclass + id, newdata = subset(m.data, T == 1), wts = "weights", comparison = "lnoravg")  # logOR					
 		}	
 	} else {
 		m.data = match.data(m)
-		if(length(unique(dat$Y)) != 2)  # 连续响应变量
+		if(length(unique(dat$Y)) != 2)  # continuous response
 		{
 			fit = lm(formula2, data = m.data, weights = weights)
 			ATT = avg_comparisons(fit, variables = "T", vcov = ~ subclass, newdata = subset(m.data, T == 1), wts = "weights")				
-		} else {  # 二分类响应变量
+		} else {  # binary response
 			fit = glm(formula2, data = m.data, weights = weights, family = quasibinomial())
 			ATT_lnRR = avg_comparisons(fit, variables = "T", vcov = ~ subclass, newdata = subset(m.data, T == 1), wts = "weights", comparison = "lnratioavg")  # transform = "exp", logRR	
 			ATT_lnOR = avg_comparisons(fit, variables = "T", vcov = ~ subclass, newdata = subset(m.data, T == 1), wts = "weights", comparison = "lnoravg")  # logOR			
@@ -315,22 +315,22 @@ psm_ATT = function(dat, replace=TRUE, formula.select=1, is.m=FALSE) {
 	# Estimating Treatment Effects
 	if(replace) {
 		m.data = get_matches(m)
-		if(length(unique(dat$Y)) != 2)  # 连续响应变量
+		if(length(unique(dat$Y)) != 2)  # continuous response
 		{
 			fit = lm(formula2, data = m.data, weights = weights)
 			ATT = avg_comparisons(fit, variables = "T", vcov = ~ subclass + id, newdata = subset(m.data, T == 1), wts = "weights")				
-		} else {  # 二分类响应变量
+		} else {  # binary response
 			fit = glm(formula2, data = m.data, weights = weights, family = quasibinomial())
 			ATT_lnRR = avg_comparisons(fit, variables = "T", vcov = ~ subclass + id, newdata = subset(m.data, T == 1), wts = "weights", comparison = "lnratioavg")  # transform = "exp", logRR					
 			ATT_lnOR = avg_comparisons(fit, variables = "T", vcov = ~ subclass + id, newdata = subset(m.data, T == 1), wts = "weights", comparison = "lnoravg")  # logOR					
 		}	
 	} else {
 		m.data = match.data(m)
-		if(length(unique(dat$Y)) != 2)  # 连续响应变量
+		if(length(unique(dat$Y)) != 2)  # continuous response
 		{
 			fit = lm(formula2, data = m.data, weights = weights)
 			ATT = avg_comparisons(fit, variables = "T", vcov = ~ subclass, newdata = subset(m.data, T == 1), wts = "weights")				
-		} else {  # 二分类响应变量
+		} else {  # binary response
 			fit = glm(formula2, data = m.data, weights = weights, family = quasibinomial())
 			ATT_lnRR = avg_comparisons(fit, variables = "T", vcov = ~ subclass, newdata = subset(m.data, T == 1), wts = "weights", comparison = "lnratioavg")  # transform = "exp", logRR	
 			ATT_lnOR = avg_comparisons(fit, variables = "T", vcov = ~ subclass, newdata = subset(m.data, T == 1), wts = "weights", comparison = "lnoravg")  # logOR			
@@ -421,22 +421,22 @@ pca_ATT = function(dat, d, replace=TRUE, formula.select=1, distance="euclidean",
 	
 	if(replace) {
 		m.data = get_matches(m)
-		if(length(unique(dat$Y)) != 2)  # 连续响应变量
+		if(length(unique(dat$Y)) != 2)  # continuous response
 		{
 			fit = lm(formula4, data = m.data, weights = weights)
 			ATT = avg_comparisons(fit, variables = "T", vcov = ~ subclass + id, newdata = subset(m.data, T == 1), wts = "weights")				
-		} else {  # 二分类响应变量
+		} else {  # binary response
 			fit = glm(formula4, data = m.data, weights = weights, family = quasibinomial())
 			ATT_lnRR = avg_comparisons(fit, variables = "T", vcov = ~ subclass + id, newdata = subset(m.data, T == 1), wts = "weights", comparison = "lnratioavg")  # transform = "exp", logRR					
 			ATT_lnOR = avg_comparisons(fit, variables = "T", vcov = ~ subclass + id, newdata = subset(m.data, T == 1), wts = "weights", comparison = "lnoravg")  # logOR					
 		}	
 	} else {
 		m.data = match.data(m)
-		if(length(unique(dat$Y)) != 2)  # 连续响应变量
+		if(length(unique(dat$Y)) != 2)  # continuous response
 		{
 			fit = lm(formula4, data = m.data, weights = weights)
 			ATT = avg_comparisons(fit, variables = "T", vcov = ~ subclass, newdata = subset(m.data, T == 1), wts = "weights")				
-		} else {  # 二分类响应变量
+		} else {  # binary response
 			fit = glm(formula4, data = m.data, weights = weights, family = quasibinomial())
 			ATT_lnRR = avg_comparisons(fit, variables = "T", vcov = ~ subclass, newdata = subset(m.data, T == 1), wts = "weights", comparison = "lnratioavg")  # transform = "exp", logRR	
 			ATT_lnOR = avg_comparisons(fit, variables = "T", vcov = ~ subclass, newdata = subset(m.data, T == 1), wts = "weights", comparison = "lnoravg")  # logOR			
@@ -463,34 +463,34 @@ pca_ATT = function(dat, d, replace=TRUE, formula.select=1, distance="euclidean",
 # cosine_dist = function(df) {
   
   # mat = as.matrix(df)
-  # norms = sqrt(rowSums(mat^2))    # 计算每个向量的模
-  # mat = mat / norms    # 标准化每个向量
-  # cosine_similarity_matrix = mat %*% t(mat)    # 计算夹角余弦相似度矩阵
-  # dist_matrix = 1 - cosine_similarity_matrix    # 将余弦相似度转换为余弦距离
+  # norms = sqrt(rowSums(mat^2))    # Calculate the norm of each vector
+  # mat = mat / norms    # Standardize each vector
+  # cosine_similarity_matrix = mat %*% t(mat)    # Calculate the cosine similarity matrix of angles
+  # dist_matrix = 1 - cosine_similarity_matrix    # Convert cosine similarity to cosine distance
 
   # return(dist_matrix)
 # }
 
 cosine_dist = function(formula, data) {
 
-  if (!inherits(formula, "formula") | !is.data.frame(data)) {    # 检查输入是否正确
+  if (!inherits(formula, "formula") | !is.data.frame(data)) {    # Check if the input is correct
     stop("The first argument must be a formula and the second must be a data frame")
   }
 
-  response = all.vars(formula)[1]    # 提取分类变量和协变量
+  response = all.vars(formula)[1]    # Extract categorical variables and covariates
   covariates = all.vars(formula)[-1]
-  group_1 = data[data[[response]] == 1, covariates]     # 根据分类变量分割数据
+  group_1 = data[data[[response]] == 1, covariates]     # Split data according to categorical variables
   group_0 = data[data[[response]] == 0, covariates]
   
-  mat_1 = as.matrix(group_1)    # 将数据框转换为矩阵
+  mat_1 = as.matrix(group_1)    # Convert data frame to matrix
   mat_0 = as.matrix(group_0)
-  norms_1 = sqrt(rowSums(mat_1^2))    # 计算每个向量的模
+  norms_1 = sqrt(rowSums(mat_1^2))    # Calculate the norm of each vector
   norms_0 = sqrt(rowSums(mat_0^2))
-  mat_1 = mat_1 / norms_1    # 标准化每个向量
+  mat_1 = mat_1 / norms_1    # Standardize each vector
   mat_0 = mat_0 / norms_0
 
-  cosine_similarity_matrix = mat_1 %*% t(mat_0)    # 计算两组之间的余弦相似度矩阵
-  dist_matrix = 1 - cosine_similarity_matrix    # 将余弦相似度转换为余弦距离
+  cosine_similarity_matrix = mat_1 %*% t(mat_0)    # Calculate the cosine similarity matrix between two groups
+  dist_matrix = 1 - cosine_similarity_matrix    # Convert cosine similarity to cosine distance
 
   return(dist_matrix)
 }
@@ -565,22 +565,22 @@ kdrm_ATT = function(dat, d, iter=1, replace=TRUE, formula.select=1, MMD=list(), 
 			
 			if(replace) {
 				m.data = get_matches(m)
-				if(length(unique(dat$Y)) != 2)  # 连续响应变量
+				if(length(unique(dat$Y)) != 2)  # continuous response
 				{
 					fit = lm(formula4, data = m.data, weights = weights)
 					ATT = avg_comparisons(fit, variables = "T", vcov = ~ subclass + id, newdata = subset(m.data, T == 1), wts = "weights")				
-				} else {  # 二分类响应变量
+				} else {  # binary response
 					fit = glm(formula4, data = m.data, weights = weights, family = quasibinomial())
 					ATT_lnRR = avg_comparisons(fit, variables = "T", vcov = ~ subclass + id, newdata = subset(m.data, T == 1), wts = "weights", comparison = "lnratioavg")  # transform = "exp", logRR					
 					ATT_lnOR = avg_comparisons(fit, variables = "T", vcov = ~ subclass + id, newdata = subset(m.data, T == 1), wts = "weights", comparison = "lnoravg")  # logOR					
 				}	
 			} else {
 				m.data = match.data(m)
-				if(length(unique(dat$Y)) != 2)  # 连续响应变量
+				if(length(unique(dat$Y)) != 2)  # continuous response
 				{
 					fit = lm(formula4, data = m.data, weights = weights)
 					ATT = avg_comparisons(fit, variables = "T", vcov = ~ subclass, newdata = subset(m.data, T == 1), wts = "weights")				
-				} else {  # 二分类响应变量
+				} else {  # binary response
 					fit = glm(formula4, data = m.data, weights = weights, family = quasibinomial())
 					ATT_lnRR = avg_comparisons(fit, variables = "T", vcov = ~ subclass, newdata = subset(m.data, T == 1), wts = "weights", comparison = "lnratioavg")  # transform = "exp", logRR	
 					ATT_lnOR = avg_comparisons(fit, variables = "T", vcov = ~ subclass, newdata = subset(m.data, T == 1), wts = "weights", comparison = "lnoravg")  # logOR			
@@ -609,24 +609,24 @@ kdrm_ATT = function(dat, d, iter=1, replace=TRUE, formula.select=1, MMD=list(), 
 		}	
 	}
 	
-	if( (n1*n2) %% 2 == 1) {  # 奇数
+	if( (n1*n2) %% 2 == 1) {  # odd numbers
 		if(length(unique(dat$Y)) != 2) {
 			med = median(Est[ , , 1])
-			idx = which(med == Est, arr.ind=TRUE)  # 返回行列索引
+			idx = which(med == Est, arr.ind=TRUE)  # return row and column indices
 			se = Est[idx[1], idx[2], 2]
 			low = Est[idx[1], idx[2], 3]
 			high = Est[idx[1], idx[2], 4]
 			m = lstm[[idx[1]]][[idx[2]]]			
 		} else {
 			med = c(median(EstRR[ , , 1]), median(EstOR[ , , 1]))
-			idxRR = which(med[1] == EstRR, arr.ind=TRUE)  # 返回行列索引
-			idxOR = which(med[2] == EstOR, arr.ind=TRUE)  # 返回行列索引
+			idxRR = which(med[1] == EstRR, arr.ind=TRUE)  # return row and column indices
+			idxOR = which(med[2] == EstOR, arr.ind=TRUE)  # return row and column indices
 			se = c(EstRR[idxRR[1], idxRR[2], 2], EstOR[idxOR[1], idxOR[2], 2])
 			low = c(EstRR[idxRR[1], idxRR[2], 3], EstOR[idxOR[1], idxOR[2], 3])
 			high = c(EstRR[idxRR[1], idxRR[2], 4], EstOR[idxOR[1], idxOR[2], 4])
 			m = lstm[[idxRR[1]]][[idxRR[2]]]				
 		}
-	} else {  # 偶数
+	} else {  # even number
 		if(length(unique(dat$Y)) != 2) {
 			med = median(Est[ , , 1])
 			se = median(Est[ , , 2])
@@ -664,7 +664,7 @@ estimate_ATT = function(method, d=2, replace=TRUE, B=500, N=1000, MMD=list(), in
   future::plan(future::multisession)
   ATT = future_lapply(1:B, future.seed=TRUE, FUN=function(x) {	
 	set.seed(x + 99)
-	dat = simdata_synthetic(N = N)  #
+	dat = simdata_synthetic(N = N)  
 	if(method == 'euclidean') {
 		res = euc_ATT(dat, replace=replace, formula.select=1)
 		
@@ -690,7 +690,7 @@ estimate_ATT = function(method, d=2, replace=TRUE, B=500, N=1000, MMD=list(), in
   future::plan(future::sequential)
   
   ATT = do.call(rbind, ATT) 
-  MSE = mean((ATT[ , 1] - 1)^2)  # 均方误差
+  MSE = mean((ATT[ , 1] - 1)^2)  # MSE
   SE = mean(ATT[ , 2], na.rm=T)
   return(data.frame(method=method, d=d, MSE=MSE, SE=SE))
 
@@ -730,11 +730,11 @@ error_ATT = function(method, d=2, replace=TRUE, B=500, N=2000, MMD=list(), inter
   future::plan(future::sequential)
   
   ATT = do.call(rbind, ATT) 
-  MSE = mean((ATT[ , 1] - 2)^2)  # 均方误差
-  RMSE = sqrt(MSE)  # 均方根误差
-  MAE = mean(abs(ATT[ , 1] - 2))  # 平均绝对误差  
-  MAPE = mean(abs(ATT[ , 1] - 2)/2)  # 平均绝对百分比误差
-  SMAPE = mean( abs(ATT[ , 1] - 2)/(abs(ATT[ , 1])/2 + 1) )  # 对称平均绝对百分比误差
+  MSE = mean((ATT[ , 1] - 2)^2)  # MSE
+  RMSE = sqrt(MSE)  # RMSE
+  MAE = mean(abs(ATT[ , 1] - 2))  # MAE  
+  MAPE = mean(abs(ATT[ , 1] - 2)/2)  # MAPE
+  SMAPE = mean( abs(ATT[ , 1] - 2)/(abs(ATT[ , 1])/2 + 1) )  # SMAPE
   SE = mean(ATT[ , 2], na.rm=T)
   return(data.frame(method=method, d=d, MSE=MSE, RMSE=RMSE, MAE=MAE, MAPE=MAPE, SMAPE=SMAPE, SE=SE))
 
