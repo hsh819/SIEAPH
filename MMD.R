@@ -3,8 +3,8 @@
 
 ###############################################################################################
 gaussian_kernel = function(control, treat, kernel_mul = 2.0, kernel_num = 5, fix_sigma = NULL) {
-  stopifnot(kernel_num %% 1 == 0) # 检查是否为整数
-  stopifnot(kernel_num > 0) # 检查是否为正数
+  stopifnot(kernel_num %% 1 == 0) # Check if it is an integer
+  stopifnot(kernel_num > 0) # Check if it is a positive number
   
   control = as.matrix(control)
   treat = as.matrix(treat)
@@ -75,27 +75,27 @@ QR = function(K, M, D) {
 
 data_cut = function(control, treat, m) {
 
-	# 参数
+	# parameter
 	NC = nrow(control)
 	NT = nrow(treat)
 	D = ncol(control)
-	nC = floor(nrow(control) / m) # 每份大小
+	nC = floor(nrow(control) / m) # each size
 	nT = floor(nrow(treat) / m)
 
-	# 检查
+	# check
 	stopifnot( nC >= D)  
 	stopifnot( nT >= D)
 	stopifnot( D == ncol(treat))  	
 
-	# 随机排列原矩阵行号
+	# Randomly permute the row numbers of the original matrix
 	rC = sample(seq_len(NC))
 	rT = sample(seq_len(NT))
 	
-	# 将行号分成m组
+	# Divide the row numbers into m groups
 	chunks_C = split(rC, cut(rC, breaks = m, labels = FALSE))
 	chunks_T = split(rT, cut(rT, breaks = m, labels = FALSE))	
 
-	# 根据行号分割矩阵 
+	# Split the matrix according to the row numbers
 	XC = lapply(chunks_C, function(i) control[i, ])
 	XT = lapply(chunks_T, function(i) treat[i, ])
 	
@@ -156,29 +156,29 @@ iter_MMD = function(DX, Q, D, m, niter=20, eps=10-3) {
 }
 
 min_MMD = function(control, treat, m = 5) {
-# control: 控制组协变量矩阵
-# treat: 处理组协变量矩阵
-# m: 分割数量
+# control: control group covariate matrix
+# treat: treatment group covariate matrix
+# m: split quantity
      	
-	# 数据分割
+	# data split
 	if(m > 1) {
 	  DX = data_cut(control=control, treat=treat, m=m)    
 	} else {
 	  DX = list(XC=list(control), XT=list(treat))
 	}
 	
-	# 初始化Q 
+	# Initialize Q 
 	D = ncol(control)	
 	M0 = matrix(rnorm(D^2), nrow=D)
 	M1 = qr(M0)	
 	Q = qr.Q(M1)	
 	res = iter_MMD(DX=DX, Q=Q, D=D, m=m)
 
-	# 返回MMD最小值位置
+	# Return the position of the minimum MMD value
 	mat = sapply(res, function(x) x$MMD[, 1])
 	min_idx = which(mat == min(mat), arr.ind = TRUE)
 
-	# 获取最小值
+	# Get the minimum value
 	min_Q = res[[min_idx]]$Q
 	min_MMD = res[[min_idx]]$MMD
 
