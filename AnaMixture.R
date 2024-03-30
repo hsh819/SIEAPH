@@ -1,4 +1,4 @@
-###AnaMixture.R
+### AnaMixture.R
 
 
 library(gWQS)
@@ -9,20 +9,19 @@ library(bkmrhat)
 library(bsmim2)
 
 
-####################################################数据预处理#############################################
-setwd("E:/TAPdata")
+####################################################Data preprocessing#############################################
 cohort = read.csv("cohort_TAP_cokrige.csv", header=TRUE)
 cohort_glucose = cohort[, c("glucose","TAP.cokrige.PM2.5.3","agg.cokrige.PM10.3","agg.cokrige.NO2.3","agg.cokrige.SO2.3","TAP.cokrige.O3.3","agg.cokrige.CO.3",                                             						                       
                         "age","BMI","sex","marriage","education","history.diabetes","cook.group","duration.group","smoking","exercise","mask","cleaner",  
                         "IFG","UnitID","region","diabetes","retire")]
 
-dat = subset(cohort_glucose, diabetes == 0 & retire == 0 & age <= 65 & age >= 18 & !is.na(IFG))  # 筛选数据集
+dat = subset(cohort_glucose, diabetes == 0 & retire == 0 & age <= 65 & age >= 18 & !is.na(IFG))  # Filter the dataset
 dat = subset(dat, region != 1)
 						
 
 update_data = function(flag = TRUE, num = 21)
-## flag = TRUE，表示删除数据集重复行；flag = FALSE，表示删除暴露变量重复行
-## num表示变量的个数，介于13~21之间
+# When flag = TRUE, it indicates that duplicate rows in the dataset should be removed; when flag = FALSE, it indicates that duplicate rows of the exposure variable should be removed. 
+# num represents the number of variables, which is between 13 and 21.
 {
 	if(num > 21 | num < 13)
 	{
@@ -30,55 +29,54 @@ update_data = function(flag = TRUE, num = 21)
 	}
 	m = num - 2
 	
-	# 去掉region, diabetes, retire, 缺失值
+	# delete region, diabetes, retire, NA
 	dat = na.omit(dat[, c(1:m, 20:21)])   	
 	if(flag == TRUE)
 	{
-		dupidx = which(duplicated(dat))  # 数据集重复行下标
+		dupidx = which(duplicated(dat))  # Duplicate row indices in the dataset
 		if( length(dupidx) > 0)
 		{
-			dat = dat[-dupidx, ]  # 去掉重复行
+			dat = dat[-dupidx, ]  # Remove duplicate rows
 		}
 	} else {
-		dupidx = which(duplicated(dat[, 2:7]))  # 暴露变量重复行下标
+		dupidx = which(duplicated(dat[, 2:7]))  # Duplicate row indices of the exposure variables
 		if( length(dupidx) > 0)
 		{
-			dat = dat[-dupidx, ]  # 去掉重复行
+			dat = dat[-dupidx, ]  
 		}
 	}
 
 	if(m >= 18)
 	{
-		##修改mask类别
-		dat$mask[dat$mask == 1] = 0  #不戴或偶尔戴口罩
-		dat$mask[dat$mask == 2] = 1  #经常戴口罩
+		dat$mask[dat$mask == 1] = 0  # Not wearing or occasionally wearing a mask
+		dat$mask[dat$mask == 2] = 1  # Frequently wearing a mask
 	}
 
-	##单位转换
+	# Unit conversion
 	colnames(dat)[2:7] = c('PM2.5', 'PM10', 'NO2', 'SO2', 'O3', 'CO')
-	dat[, 2:7] = dat[, 2:7] * 10  #单位转换为μg/m³
-	dat$NO2 = dat$NO2 / 1.914  #单位转换为ppb
-	dat$SO2 = dat$SO2 / 2.660  #单位转换为ppb
-	dat$O3 = dat$O3 / 1.9957   #单位转换为ppb, part per billion	
-	dat$CO = dat$CO / 1.165  #单位转换为ppb	
+	dat[, 2:7] = dat[, 2:7] * 10  # μg/m³
+	dat$NO2 = dat$NO2 / 1.914  # ppb
+	dat$SO2 = dat$SO2 / 2.660  # ppb
+	dat$O3 = dat$O3 / 1.9957   # ppb	
+	dat$CO = dat$CO / 1.165  # ppb	
 	
-	# 排除异常样本
-	dat[, 1:9] = scale(dat[, 1:9])  # 结局变量、暴露变量和连续协变量标准化
+	# Exclude outlier samples
+	dat[, 1:9] = scale(dat[, 1:9])  # Standardize the outcome variable, exposure variable, and continuous covariates
 	outidx = lapply(dat[, 1:9], function(x) { idx = which(x < -3 | x > 3) })
 	outidx = do.call(c, outidx)
-	outidx = unique(outidx)  # 排除3倍标准差之外样本
+	outidx = unique(outidx)  # Exclude samples outside three times the standard deviation
 	dat = dat[-outidx, ]
 
-	# 排除出现次数少的类别
-	ID = as.character(dat$UnitID)  # 随机效应
+	# Remove infrequent categories
+	ID = as.character(dat$UnitID)  # Random effect
 	tab = table(ID)
 	IDname = names(tab)[tab < 5]
-	IDidx = which(ID %in% IDname)  # 排除出现次数小于5的单位
+	IDidx = which(ID %in% IDname)  # Exclude workplaces with fewer than 5 occurrences
 	dat = dat[-IDidx, ]
 	
-	# 离散协变量转虚拟变量
-	dat[, c(10:m, ncol(dat))] = lapply(dat[, c(10:m, ncol(dat))], as.factor)  # 离散协变量，包括UnitID
-	dummy = model.matrix(~., data=dat[, 10:m])  #将分类变量转化为虚拟变量, 去掉了缺失值
+	# Encode categorical covariates as dummy variables
+	dat[, c(10:m, ncol(dat))] = lapply(dat[, c(10:m, ncol(dat))], as.factor)  # Categorical covariates, including UnitID
+	dummy = model.matrix(~., data=dat[, 10:m])  # Encode categorical variables as dummy variables after removing missing values
 	dummy = dummy[, -1]
 	colnames(dat)[ncol(dat)] = 'ID'
 		
@@ -86,17 +84,17 @@ update_data = function(flag = TRUE, num = 21)
 }
 
 #lst = update_data(flag=FALSE, num=21)  
-lst = update_data(flag=FALSE, num=15)  # 选择离散变量sex, marriage, education, history.diabetes
+lst = update_data(flag=FALSE, num=15)  # Select categorical covariates: sex, marriage, education, history.diabetes
 
 
-## 分析数据集
+## Analyze the dataset
 pollutants = c("PM2.5", "PM10", "NO2", "SO2", "O3", "CO")
 covarnames = names(lst$dat)[8:(ncol(lst$dat) - 2)]
 
-X = as.matrix(lst$dat[, pollutants])  # 暴露变量
-y = lst$dat$glucose  # 连续响应
-ybin = as.numeric(as.character(lst$dat$IFG))  # 离散响应
-Z = as.matrix(cbind(lst$dat[, c('age', 'BMI')], lst$dummy))  # 协变量
+X = as.matrix(lst$dat[, pollutants])  # Exposure variables
+y = lst$dat$glucose  # Continuous response
+ybin = as.numeric(as.character(lst$dat$IFG))  # Categorical response
+Z = as.matrix(cbind(lst$dat[, c('age', 'BMI')], lst$dummy))  # Covariates
 ID = factor(lst$dat$ID)
 
 comp_dat = list(y=y, ybin=ybin, X=X, Z=Z, ID=ID)  
@@ -105,32 +103,32 @@ comp_dat = list(y=y, ybin=ybin, X=X, Z=Z, ID=ID)
 #################################################gWQS#################################################
 library(gWQS)
 library(lmerTest)
-formulas1 = as.formula("glucose ~ wqs")  # 初始模型，连续
-formulas2 = as.formula(paste("glucose ~ wqs", paste(covarnames, collapse = "+"), sep="+"))  # 调整模型，连续
-formulas3 = as.formula("IFG ~ wqs")  # 初始模型，离散
-formulas4 = as.formula(paste("IFG ~ wqs", paste(covarnames, collapse = "+"), sep="+"))  # 调整模型，离散					   
+formulas1 = as.formula("glucose ~ wqs")  # Initial model, continuous
+formulas2 = as.formula(paste("glucose ~ wqs", paste(covarnames, collapse = "+"), sep="+"))  # Adjust the model, continuous
+formulas3 = as.formula("IFG ~ wqs")  # Initial model, categorial
+formulas4 = as.formula(paste("IFG ~ wqs", paste(covarnames, collapse = "+"), sep="+"))  # Adjust model, categorical					   
 
 GWQS = function(formulas, mix_name, data, b1_pos=TRUE, is.gauss=TRUE, seed=123)
 {
 	if(is.gauss == TRUE)
 	{
 		results = gwqs(formulas, mix_name=mix_name, data=data, q = 10, validation = 0.6, b = 200, b1_pos=b1_pos, 
-						b1_constr = TRUE, family=gaussian, seed=seed, plan_strategy="multisession")  # 并行计算
+						b1_constr = TRUE, family=gaussian, seed=seed, plan_strategy="multisession")  # Parallel computing
 		vindex = results$vindex
 		valdata = cbind(results$fit$data, ID=data[vindex, 'ID'])
 		valformulas = as.formula(paste(deparse(formulas), "(1|ID)", sep="+"))
 		valresults = lmer(valformulas, data=valdata)
-		coefs = summary(valresults)$coef[, -3]  # 去掉df	
+		coefs = summary(valresults)$coef[, -3]  # Delete df	
 	
 	} else {
 		results = gwqs(formulas, mix_name=mix_name, data=data, q = 10, validation = 0.6, b = 200, b1_pos=b1_pos, 
-						b1_constr = TRUE, family=binomial, seed=seed, plan_strategy="multisession")  # 并行计算
+						b1_constr = TRUE, family=binomial, seed=seed, plan_strategy="multisession")  # Parallel computing
 		vindex = results$vindex
 		valdata = cbind(results$fit$data, ID=data[vindex, 'ID'])		
 		valformulas = as.formula(paste(deparse(formulas), "(1|ID)", sep="+"))
 		valresults = glmer(valformulas, data=valdata)
 		coefs = summary(valresults)$coef
-		pvalue = 2 * pnorm(-abs(coefs[, 't value']))  # 近似计算p值
+		pvalue = 2 * pnorm(-abs(coefs[, 't value']))  # Approximate computation of p-value
 		coefs = cbind(coefs, pvalue)
 	
 	}
@@ -143,15 +141,15 @@ GWQS = function(formulas, mix_name, data, b1_pos=TRUE, is.gauss=TRUE, seed=123)
 
 }
 
-results1.1 = GWQS(formulas1, mix_name=pollutants, data=lst$dat, b1_pos=TRUE, is.gauss=TRUE)  # 初始模型，连续，正约束
-results1.2 = GWQS(formulas1, mix_name=pollutants, data=lst$dat, b1_pos=FALSE, is.gauss=TRUE)  # 初始模型，连续，负约束
-results1.3 = GWQS(formulas2, mix_name=pollutants, data=lst$dat, b1_pos=TRUE, is.gauss=TRUE)  # 调整模型，连续，正约束
-results1.4 = GWQS(formulas2, mix_name=pollutants, data=lst$dat, b1_pos=FALSE, is.gauss=TRUE)  # 调整模型，连续，负约束
+results1.1 = GWQS(formulas1, mix_name=pollutants, data=lst$dat, b1_pos=TRUE, is.gauss=TRUE)  # Initial model, continuous, positive constraint
+results1.2 = GWQS(formulas1, mix_name=pollutants, data=lst$dat, b1_pos=FALSE, is.gauss=TRUE)  # Initial model, continuous, negative constraint
+results1.3 = GWQS(formulas2, mix_name=pollutants, data=lst$dat, b1_pos=TRUE, is.gauss=TRUE)  # Adjust model, continuous, positive constraint
+results1.4 = GWQS(formulas2, mix_name=pollutants, data=lst$dat, b1_pos=FALSE, is.gauss=TRUE)  # Adjust model, continuous, negative constraint
 
-results1.5 = GWQS(formulas3, mix_name=pollutants, data=lst$dat, b1_pos=TRUE, is.gauss=FALSE)  # 初始模型，离散，正约束
-results1.6 = GWQS(formulas3, mix_name=pollutants, data=lst$dat, b1_pos=FALSE, is.gauss=FALSE)  # 初始模型，离散，负约束
-results1.7 = GWQS(formulas4, mix_name=pollutants, data=lst$dat, b1_pos=TRUE, is.gauss=FALSE)  # 调整模型，离散，正约束
-results1.8 = GWQS(formulas4, mix_name=pollutants, data=lst$dat, b1_pos=FALSE, is.gauss=FALSE)  # 调整模型，离散，负约束
+results1.5 = GWQS(formulas3, mix_name=pollutants, data=lst$dat, b1_pos=TRUE, is.gauss=FALSE)  # Initial model, categorical, positive constraint
+results1.6 = GWQS(formulas3, mix_name=pollutants, data=lst$dat, b1_pos=FALSE, is.gauss=FALSE)  # Initial model, categorical, negative constraint
+results1.7 = GWQS(formulas4, mix_name=pollutants, data=lst$dat, b1_pos=TRUE, is.gauss=FALSE)  # Adjust model, categorical, positive constraint
+results1.8 = GWQS(formulas4, mix_name=pollutants, data=lst$dat, b1_pos=FALSE, is.gauss=FALSE)  # Adjust model, categorical, negative constraint
 
 lst1 = list(results1.1, results1.2, results1.3, results1.4, results1.5, results1.6, results1.7, results1.8)
 lst11 = lapply(lst1, function(x) { x$coefs[1:2, ] })
@@ -167,7 +165,7 @@ write.csv(res11, file="gwqs_coefs.csv")
 write.csv(res12, file="gwqs_weights.csv", row.names=FALSE)
 
 
-##############没有随机效应gwqs##############
+##############No random effects gwqs##############
 reorder_weights = function(results)
 {
 	final_weights = results$final_weights
@@ -178,17 +176,17 @@ reorder_weights = function(results)
 }
 
 results1.1 = gwqs(formulas2, mix_name=pollutants, data=lst$dat, q = 10, validation = 0.6, b = 100, b1_pos=TRUE, 
-						b1_constr = TRUE, family=gaussian, seed=123, plan_strategy="multisession")  #连续，调整模型，正约束 
+						b1_constr = TRUE, family=gaussian, seed=123, plan_strategy="multisession")  # Continuous, adjust model, positive constraint
 wqs_weight1 = cbind(summary(results1.1$fit)$coef[2, , drop=FALSE], t(reorder_weights(results1.1)[, 2, drop=FALSE]))
 
 
 results1.2 = gwqsrh(formulas2, mix_name=pollutants, data=lst$dat, q = 10, validation = 0.6, b = 100, b1_pos=TRUE, rh=20,
-						b1_constr = TRUE, family=gaussian, seed=123, plan_strategy="multisession")  #连续，调整模型，正约束 
+						b1_constr = TRUE, family=gaussian, seed=123, plan_strategy="multisession")  # Continuous, adjust model, positive constraint
 wqs_weight2 = cbind(results1.2$fit$coef[2, 1:4, drop=FALSE], t(reorder_weights(results1.2)[, 2, drop=FALSE]))
 
 
 results1.3 = gwqs(formulas2, mix_name=pollutants, data=lst$dat, q = 10, validation = 0, b = 100, b1_pos=TRUE, 
-						b1_constr = TRUE, family=gaussian, seed=123, plan_strategy="multisession")  #连续，调整模型，正约束 
+						b1_constr = TRUE, family=gaussian, seed=123, plan_strategy="multisession")  # Continuous, adjust model, positive constraint
 wqs_weight3 = cbind(summary(results1.3$fit)$coef[2, , drop=FALSE], t(reorder_weights(results1.3)[, 2, drop=FALSE]))
 
 wqs_weights = rbind(wqs_weight1, wqs_weight2, wqs_weight3)
@@ -197,11 +195,11 @@ rownames(wqs_weights) = c("rh1", "rh100", "valid0")
 write.csv(t(wqs_weights), "wqs_coef_weights.csv")	
 
 
-##############随机效应gwqs##############
+##############Random effect gwqs##############
 source("gwqs_re.R")
 source("gwqs_related.R")
 results1.4 = gwqs_re(formulas2, mix_name = pollutants, data = lst$dat, q = 10, validation = 0.6, b = 100, 
-                b1_pos = TRUE, b1_constr = TRUE, family = gaussian, id = 'ID', seed = 123, plan_strategy = "multisession")  #连续，调整模型，正约束
+                b1_pos = TRUE, b1_constr = TRUE, family = gaussian, id = 'ID', seed = 123, plan_strategy = "multisession")  # Continuous, adjust model, positive constraint
 pval1 = 2*pnorm(-abs(summary(results1.4$fit)$coef[, 3]))
 wqsre_weight1 = cbind(summary(results1.4$fit)$coef[2, , drop=FALSE], pval=pval1[2], t(results1.4$final_weights[, 2, drop=FALSE]))
 
@@ -209,7 +207,7 @@ wqsre_weight1 = cbind(summary(results1.4$fit)$coef[2, , drop=FALSE], pval=pval1[
 gwqsre_rh = function(i)
 {
 	res = gwqs_re(formulas2, mix_name = pollutants, data = lst$dat, q = 10, validation = 0.6, b = 100, 
-					b1_pos = TRUE, b1_constr = TRUE, family = gaussian, id = 'ID', seed = 100+i, plan_strategy = "multisession")  #连续，调整模型，正约束
+					b1_pos = TRUE, b1_constr = TRUE, family = gaussian, id = 'ID', seed = 100+i, plan_strategy = "multisession")  # Continuous, adjust model, positive constraint
 	final_weights = res$final_weights
 	coefs =  summary(res$fit)$coef[1:2, ]
 	return(list(coefs=coefs, final_weights=final_weights))
@@ -227,7 +225,7 @@ wqsre_weight2 = c(apply(lst11, 2, mean), pval=mean(pval2), apply(lst12, 1, mean)
 
 
 results1.6 = gwqs_re(formulas2, mix_name = pollutants, data = lst$dat, q = 10, validation = 0, b = 100, 
-                   b1_pos = TRUE, b1_constr = TRUE, family = gaussian, id = 'ID', seed = 123, plan_strategy = "multisession")  #连续，调整模型，正约束
+                   b1_pos = TRUE, b1_constr = TRUE, family = gaussian, id = 'ID', seed = 123, plan_strategy = "multisession")  # Continuous, adjust model, positive constraint
 pval3 = 2*pnorm(-abs(summary(results1.6$fit)$coef[, 3]))
 wqsre_weight3 = cbind(summary(results1.6$fit)$coef[2, , drop=FALSE], pval=pval3[2], t(results1.6$final_weights[, 2, drop=FALSE]))				   
 
@@ -238,17 +236,17 @@ write.csv(t(wqsre_weights), "wqsre_coef_weights.csv")
 
 
 # results1.7 = gwqs_re(formulas2, mix_name = pollutants, data = lst$dat, q = 10, validation = 0.6, b = 100, 
-                # b1_pos = FALSE, b1_constr = TRUE, family = gaussian, id = 'ID', seed = 123, plan_strategy = "multisession")  #连续，调整模型，负约束
+                # b1_pos = FALSE, b1_constr = TRUE, family = gaussian, id = 'ID', seed = 123, plan_strategy = "multisession")  # Continuous, adjust model, negative constraint
 # wqsre_weight4 = cbind(summary(results1.7$fit)$coef[2, , drop=FALSE], t(results1.7$final_weights[, 2, drop=FALSE]))				
 
 				
 
 #################################################qgcomp#################################################
 library(qgcomp)
-formulas5 = as.formula(paste("glucose ~", paste(pollutants, collapse = "+")))  # 初始模型，连续
-formulas6 = as.formula(paste("glucose ~", paste(paste(pollutants, collapse = "+"), paste(covarnames, collapse = "+"), sep="+")))  # 调整模型，连续
-formulas7 = as.formula(paste("IFG ~", paste(pollutants, collapse = "+")))  # 初始模型，离散 
-formulas8 = as.formula(paste("IFG ~", paste(paste(pollutants, collapse = "+"), paste(covarnames, collapse = "+"), sep="+")))  # 调整模型，离散
+formulas5 = as.formula(paste("glucose ~", paste(pollutants, collapse = "+")))  # Initial model, continuous
+formulas6 = as.formula(paste("glucose ~", paste(paste(pollutants, collapse = "+"), paste(covarnames, collapse = "+"), sep="+")))  # Adjust model, continuous
+formulas7 = as.formula(paste("IFG ~", paste(pollutants, collapse = "+")))  # Initial model, categorical 
+formulas8 = as.formula(paste("IFG ~", paste(paste(pollutants, collapse = "+"), paste(covarnames, collapse = "+"), sep="+")))  # Adjust model, categorical
 
 
 QGCOMP = function(formulas, expnms, data, family=gaussian, is.gauss=TRUE, is.boot=FALSE)
@@ -256,12 +254,12 @@ QGCOMP = function(formulas, expnms, data, family=gaussian, is.gauss=TRUE, is.boo
    
    if(is.boot)   
    {   
-     results = qgcomp.glm.boot(formulas, expnms = expnms, data=data, family=family, q=10, id='ID', B=200, rr=FALSE, seed=123, parallel=TRUE, parplan=TRUE)  # 并行计算
+     results = qgcomp.glm.boot(formulas, expnms = expnms, data=data, family=family, q=10, id='ID', B=200, rr=FALSE, seed=123, parallel=TRUE, parplan=TRUE)  # Parallel computing
   	 if(is.gauss)
   	 {
   	   coefs = summary(results)$coef
   	 } else {
-  	   coefs = summary(results)$coef[, -5]	 # 去掉Z value列
+  	   coefs = summary(results)$coef[, -5]	 # Remove Z value
   	 }
        return(list(coefs=coefs, pos.weights=NULL, neg.weights=NULL))	    
    } else {
@@ -282,7 +280,7 @@ QGCOMP = function(formulas, expnms, data, family=gaussian, is.gauss=TRUE, is.boo
   	   coeff = summary(newresults)$coef[expnms, 'Estimate']
   	   pos.weights = coeff[coeff >= 0]/sum(coeff[coeff >= 0]) 
   	   neg.weights = coeff[coeff < 0]/sum(coeff[coeff < 0])
-  	   coefs = summary(results)$coef[, -5]	 # 去掉Z value列
+  	   coefs = summary(results)$coef[, -5]	 # Remove Z value
 
   	 }
   	 pos = c(PM2.5=NA, PM10=NA, NO2=NA, SO2=NA, O3=NA, CO=NA)
@@ -294,15 +292,15 @@ QGCOMP = function(formulas, expnms, data, family=gaussian, is.gauss=TRUE, is.boo
    
 }
 
-results2.1 = QGCOMP(formulas5, expnms = pollutants, data=lst$dat, family=gaussian, is.gauss=TRUE, is.boot=FALSE)  # 初始模型，连续，不进行重抽样
-results2.2 = QGCOMP(formulas6, expnms = pollutants, data=lst$dat, family=gaussian, is.gauss=TRUE, is.boot=FALSE)  # 调整模型，连续，不进行重抽样
-results2.3 = QGCOMP(formulas7, expnms = pollutants, data=lst$dat, family=binomial, is.gauss=FALSE, is.boot=FALSE)  # 初始模型，离散，不进行重抽样
-results2.4 = QGCOMP(formulas8, expnms = pollutants, data=lst$dat, family=binomial, is.gauss=FALSE, is.boot=FALSE)  # 调整模型，离散，不进行重抽样
+results2.1 = QGCOMP(formulas5, expnms = pollutants, data=lst$dat, family=gaussian, is.gauss=TRUE, is.boot=FALSE)  # Initial model, continuous, no resampling
+results2.2 = QGCOMP(formulas6, expnms = pollutants, data=lst$dat, family=gaussian, is.gauss=TRUE, is.boot=FALSE)  # Adjust model, continuous, no resampling
+results2.3 = QGCOMP(formulas7, expnms = pollutants, data=lst$dat, family=binomial, is.gauss=FALSE, is.boot=FALSE)  # Initial model, categorical, no resampling
+results2.4 = QGCOMP(formulas8, expnms = pollutants, data=lst$dat, family=binomial, is.gauss=FALSE, is.boot=FALSE)  # Adjust model, categorical, no resampling
 
-results2.5 = QGCOMP(formulas5, expnms = pollutants, data=lst$dat, family=gaussian, is.gauss=TRUE, is.boot=TRUE)  # 初始模型，连续，进行重抽样
-results2.6 = QGCOMP(formulas6, expnms = pollutants, data=lst$dat, family=gaussian, is.gauss=TRUE, is.boot=TRUE)  # 调整模型，连续，进行重抽样  
-results2.7 = QGCOMP(formulas7, expnms = pollutants, data=lst$dat, family=binomial, is.gauss=FALSE, is.boot=TRUE)  # 初始模型，离散，进行重抽样
-results2.8 = QGCOMP(formulas8, expnms = pollutants, data=lst$dat, family=binomial, is.gauss=FALSE, is.boot=TRUE)  # 调整模型，离散，进行重抽样
+results2.5 = QGCOMP(formulas5, expnms = pollutants, data=lst$dat, family=gaussian, is.gauss=TRUE, is.boot=TRUE)  # Initial model, continuous, resampling
+results2.6 = QGCOMP(formulas6, expnms = pollutants, data=lst$dat, family=gaussian, is.gauss=TRUE, is.boot=TRUE)  # Adjust model, continuous, resampling 
+results2.7 = QGCOMP(formulas7, expnms = pollutants, data=lst$dat, family=binomial, is.gauss=FALSE, is.boot=TRUE)  # Initial model, categorical, resampling
+results2.8 = QGCOMP(formulas8, expnms = pollutants, data=lst$dat, family=binomial, is.gauss=FALSE, is.boot=TRUE)  # Adjust model, categorical, resampling
 
 lst2 = list(results2.1, results2.2, results2.3, results2.4, results2.5, results2.6, results2.7, results2.8)
 lst21 = lapply(lst2, function(x) { x$coefs })
@@ -333,8 +331,8 @@ library(ggsci)
 library(cowplot)
 
 
-############多链并行估计############################
-## 参数设置
+############Parallel estimation with multiple chains############################
+## Parameter settings
 R = 10000             ## no. of iterations
 burn = 0.5           ## percent burn-in
 thin = 40            ## thinning number
@@ -342,16 +340,16 @@ sel = seq(burn * R + 1, R, by=thin)
 
 
 # set.seed(R)
-# samp = sort(sample(length(comp_dat$y), seed))  # 抽取子样本
-# kmdat = with(comp_dat, list(y=y[samp], ybin=ybin[samp], Z=X[samp, ], X=Z[samp, ]))  # 暴露变量用z表示，调整协变量用x表示
-kmdat = with(comp_dat, list(y=y, ybin=ybin, Z=X, X=Z, ID=ID))  # 暴露变量用z表示，调整协变量用x表示
+# samp = sort(sample(length(comp_dat$y), seed))  # Extract sub-samples
+# kmdat = with(comp_dat, list(y=y[samp], ybin=ybin[samp], Z=X[samp, ], X=Z[samp, ]))  # Denote the exposure variable by z and the adjustment covariates by x
+kmdat = with(comp_dat, list(y=y, ybin=ybin, Z=X, X=Z, ID=ID))  # Denote the exposure variable by z and the adjustment covariates by x
 
 ncores = 10
-future::plan(strategy = future::multisession, workers=ncores)  # 设置并行策略，strategy='sequential', 'multisession', 'multicore', 'cluster' 
+future::plan(strategy = future::multisession, workers=ncores)  # strategy='sequential', 'multisession', 'multicore', 'cluster' 
 start = proc.time()
 set.seed(R)
-fitkm = kmbayes_parallel(nchains=ncores, y=kmdat$y, Z=kmdat$Z, X=kmdat$X, id=kmdat$ID, iter = ceiling(R/ncores), verbose = TRUE, varsel = TRUE, control.params = list(r.jump2 = 0.5))  # 连续响应，包括协变量，提高M-H算法接收率 
-# fitpr = kmbayes_parallel(nchains=ncores, y=kmdat$ybin, Z=kmdat$Z, X=kmdat$X, id=kmdat$ID, iter = ceiling(R/ncores), verbose = TRUE, varsel = TRUE, family="binomial", control.params = list(r.jump2 = 0.5))  # 离散响应，包括协变量，提高M-H算法接收率 
+fitkm = kmbayes_parallel(nchains=ncores, y=kmdat$y, Z=kmdat$Z, X=kmdat$X, id=kmdat$ID, iter = ceiling(R/ncores), verbose = TRUE, varsel = TRUE, control.params = list(r.jump2 = 0.5))  # Continuous response, including covariates, to improve the acceptance rate of the M-H algorithm
+# fitpr = kmbayes_parallel(nchains=ncores, y=kmdat$ybin, Z=kmdat$Z, X=kmdat$X, id=kmdat$ID, iter = ceiling(R/ncores), verbose = TRUE, varsel = TRUE, family="binomial", control.params = list(r.jump2 = 0.5))  # Categorical response, including covariates, to improve the acceptance rate of the M-H algorithm
 
 
 diftime = proc.time() - start
@@ -361,33 +359,33 @@ print(paste("Execution time:", round(diftime[3]/3600,2), "hours"))
 # load(file="BKMRHAT_fitkmcomb_10000.RData")
 load(file="BKMRHAT_fitkmcomb_20000.RData")
 
-## 参数设置
+## Parameter settings
 R = 20000             ## no. of iterations
 burn = 0.5           ## percent burn-in
 thin = 40            ## thinning number
 sel = seq(burn * R + 1, R, by=thin) 
 
-## 诊断
+## Diagnosis
 multidiag = kmbayes_diagnose(fitkm, warmup=0, digits_summary=2)
 # multidiag = kmbayes_diagnose(fitkmmore, warmup=0, digits_summary=2)
 
-## 后验汇总与推断
+## Posterior summary and inference
 fitkmcomb = kmbayes_combine(fitkm)
 # fitkmcomb = kmbayes_combine(fitkmmore)
 summary(fitkmcomb)
 
-## 检查模型收敛性
+## Check model convergence
 TracePlot(fit = fitkmcomb, par = "beta", comp=1)  # beta1,...,beta19
 TracePlot(fit = fitkmcomb, par = "lambda")
 TracePlot(fit = fitkmcomb, par = "sigsq.eps")
 TracePlot(fit = fitkmcomb, par = "r", comp = 1)  # r1,...,r6 
 
-## 后验包含概率
+## Posterior inclusion probability
 # multipips = lapply(fitkm, function(x) t(ExtractPIPs(x)))
 pips = ExtractPIPs(fitkmcomb)  # variable selection
 
-## 绘制暴露-响应函数
-## i.单变量横截面
+## Exposure-response function
+## i.Univariate cross-section
 pred.resp.univar = PredictorResponseUnivar(fit = fitkmcomb, method = "exact", sel = sel)
 
 tiff(file=paste0("BKMR_univar_gauss_", R, ".tif"), width=12, height=8, units="in", compression="lzw", res=144, family="sans")
@@ -402,7 +400,7 @@ ggplot(pred.resp.univar, aes(z, est, ymin = est - 1.96*se, ymax = est + 1.96*se)
 dev.off()
 
 
-## ii.两变量横截面(等高线)
+## ii.Bivariate cross-section (contour)
 expos.pairs = subset(data.frame(expand.grid(expos1 = 1:6, expos2 = 1:6)), expos1 < expos2)
 expos.pairs
 pred.resp.bivar = PredictorResponseBivar(fit = fitkmcomb, min.plot.dist = 1, z.pairs = expos.pairs, sel = sel)
@@ -419,7 +417,7 @@ dev.off()
 # Since it can be hard to see what’s going on in these types of plots, an alternative approach is to investigate the exposure-response function of a single exposure where the second exposure is fixed at various quantiles. 
 # This can be done using the PredictorResponseBivarLevels function, which takes as input the bivariate exposure-response function outputted from the previous command, where the argument qs specifies a sequence of quantiles at which to fix the second exposure
 
-## iii.两变量横截面(折线图)
+## iii.Bivariate cross-section (line plot)
 pred.resp.bivar.levels = PredictorResponseBivarLevels(pred.resp.bivar, Z=fitkmcomb$Z, qs = c(0.10, 0.50, 0.90))
 myorder = c("PM2.5", "PM10","NO2", "SO2", "O3", "CO")
 pred.resp.bivar.levels[, 1:2] = lapply(pred.resp.bivar.levels[, 1:2], function(x) factor(x, levels = myorder))
@@ -437,7 +435,7 @@ dev.off()
 # One potential summary measure of interest is to compute the overall effect of the mixture, by comparing the value of the exposure-response function when all of exposures are at a particular quantile as compared to when all of them are at their median value. 
 # The function OverallRiskSummaries allows one to specify a sequence of quantiles using the argument qs and the fixed quantile using the argument q.fixed (the default is the median value).
 
-## iv.混合物总体效应
+## iv.Mixture overall effect
 risks.overall = OverallRiskSummaries(fit = fitkmcomb, qs = seq(0.05, 0.95, by = 0.05), q.fixed = 0.5, method = "exact", sel = sel)  # method='approx' or 'exact'
 risks.overall = risks.overall[4:16, ]
 tiff(file=paste0("BKMR_overall_gauss_", R, ".tif"), width=10, height=8, units="in", compression="lzw", res=144, family="sans")
@@ -453,7 +451,7 @@ dev.off()
 # where all of the remaining exposures are fixed to a particular quantile. We refer to this as the single-exposure health risks, and these can be computed using the function SingVarRiskSummaries. The two different quantiles at which to compare the risk are specified using the 
 # qs.diff argument, and a sequence of values at which to fix the remaining exposures can be specified using the q.fixed argument.
 
-## v.单个暴露效应
+## v.Single-exposure effects
 risks.singvar = SingVarRiskSummaries(fit = fitkmcomb, qs.diff = c(0.05, 0.95), q.fixed = c(0.10, 0.50, 0.90), method = "exact", sel = sel)  # method='approx' or 'exact'
 risks.singvar
 tiff(file=paste0("BKMR_singvar_gauss_", R, ".tif"), width=10, height=8, units="in", compression="lzw", res=144, family="sans")
@@ -468,7 +466,7 @@ dev.off()
 # We may wish to compute specific ‘interaction’ parameters. For example, we may which to compare the single-exposure health risks when all of the other exposures are fixed to their 75th percentile to when all of the other exposures are fixed to their 25th percentile. 
 # In the previous plot, this corresponds to substracting the estimate represented by the red circle from the estimate represented by the blue circle. This can be done using the function SingVarIntSummaries.
 
-## vi.交互作用
+## vi.Interactions
 risks.int = SingVarIntSummaries(fit = fitkmcomb, qs.diff = c(0.05, 0.95), qs.fixed = c(0.10, 0.90), method = "exact", sel = sel)  # method='approx' or 'exact'
 risks.int
 tiff(file=paste0("BKMR_singvarint_gauss_", R, ".tif"), width=10, height=8, units="in", compression="lzw", res=144, family="sans")
@@ -482,13 +480,13 @@ dev.off()
 # dev.off()
 
 
-############继续采样############################
+############Continued sampling############################
 library(bkmr)
 library(bkmrhat)
 
 load(file="BKMRHAT_fitkmcomb_10000.RData")
 
-## 参数设置
+## Parameter settings
 R = 20000             ## no. of iterations
 burn = 0.5           ## percent burn-in
 thin = 40            ## thinning number
@@ -496,15 +494,15 @@ sel = seq(burn * R + 1, R, by=thin)
 
 
 ncores = 10
-future::plan(strategy = future::multisession, workers=ncores)  # 设置并行策略，strategy='sequential', 'multisession', 'multicore', 'cluster' 
+future::plan(strategy = future::multisession, workers=ncores)  # strategy='sequential', 'multisession', 'multicore', 'cluster' 
 start = proc.time()
 set.seed(R)
 fitkmmore = kmbayes_parallel_continue(fitkm, iter=ceiling(R/ncores))
 # fitprmore = kmbayes_parallel_continue(fitpr, iter=ceiling(R/ncores))   
 diftime = proc.time() - start
-print(paste("Execution time:", round(diftime[3]/3600, 2), "hours")) #输出循环时间
+print(paste("Execution time:", round(diftime[3]/3600, 2), "hours")) 
 
-save.image(file=paste0("BKMRHAT_fitkmmore_", R+10000, ".RData"))  #保存工作目录特定文件
+save.image(file=paste0("BKMRHAT_fitkmmore_", R+10000, ".RData"))  
 
 ################################################
 
@@ -516,17 +514,17 @@ library(bsmim2)
 library(ggplot2)
 library(ggsci)
 library(cowplot)
-# library(knitr)  # RMarkdown文档中嵌入表格
-# library(xtable)  # 输出LaTeX或HTML表格
+# library(knitr)  # Embedding tables in RMarkdown documents
+# library(xtable)  # Output LaTeX or HTML tables
 
-## 参数设置
+## Parameter settings
 R = 10000              ## no. of iterations
 burn = 0.5           ## percent burn-in
 thin = 40            ## thinning number
 sel = seq(burn * R + 1, R, by=thin) 
 
 
-## 模型预测数据
+## Model prediction data
 ## Construct new grid points, quantiles and weights
 getGrid = function(qtl=0.5,pts=20,qtl_lims=c(0.05,0.95))
 {
@@ -543,7 +541,7 @@ X50 = getGrid(qtl=0.50)
 X75 = getGrid(qtl=0.75)
 
 
-## 模型拟合数据
+## Model fitting data
 subset_data = function(ids)
 { 
   ## exposure 
@@ -628,7 +626,7 @@ pred_twoway = function(obj,qtls=c(0.1,0.9),qtl_lims=c(0.01,0.99),pts=20,include_
   return(pred_df)
 }
 
-## 指数模型拟合
+## Exponential model fitting
 bsdat = prep_data_full()
 mod_version = 1
 
@@ -668,7 +666,7 @@ if(mod_version==1){  ## fit 1-dim single index model (SIM)
 }
 
 
-## 结果汇总
+## Summary
 #loads an RData file, and returns it with new name
 loadRData = function(fileName)
 {
@@ -748,7 +746,7 @@ plot_grid(SIM, bsmim, bkmr, ncol=3, labels="AUTO", byrow=T, label_colour="black"
 dev.off()  
 
 
-## i. 单变量(univariate)
+## i.Univariate
 pp_SIM = plot_univar_hnew2(mods$SIM$pred_assoc, assoc=F, ylims=NULL)
 pp_bsmim = plot_univar_hnew2(mods$bsmim$pred_assoc, assoc=F, ylims=NULL)
 pp_bkmr = plot_univar_hnew2(mods$bkmr$pred_assoc, assoc=F, ylims=NULL)
@@ -831,7 +829,7 @@ plot_grid(SIM11, bsmim11, bkmr11, SIM12, bsmim12, bkmr12, ncol=3, labels="AUTO",
 
 dev.off()
 
-## ii.指数(indexwise)
+## ii.Indexwise
 pp_SIM_ind = plot_univar_hnew_indexwise2(mods$SIM$pred_ind)
 pp_bsmim_ind = plot_univar_hnew_indexwise2(mods$bsmim$pred_ind)
 
@@ -868,7 +866,7 @@ plot_grid(SIM_ind1, bsmim_ind1, bsmim_ind2, ncol=3, labels="AUTO", byrow=T, labe
 dev.off()
 
 
-## iii.指数交互(Indexwise interactions)
+## iii.Indexwise interactions
 pp_bsmim_inter = mods$bsmim$pred_inter
 
 tiff(file=paste0("BMIM_indexwise_inter_", R, ".tif"), width=12, height=8, units="in", compression="lzw", res=144, family="sans")
