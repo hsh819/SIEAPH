@@ -1,4 +1,5 @@
-###Mixed-effects Weighted Quantile Sum regression models
+###Mixed-effects Weighted Quantile Sum regression model
+
 
 library(future)
 library(future.apply)
@@ -35,7 +36,7 @@ gwqs_re <- function(formula, data, weights, mix_name, stratified, valid_var, b =
   if(!any(grepl("wqs", rownames(attr(terms(formula), "factors"))))) stop("'formula' must contain 'wqs' term: e.g. y ~ wqs + ...")
  
   allvars = all.vars(formula)
-  data$wqs = rnorm(nrow(data), 0, 1)  # 初始化wqs
+  data$wqs = rnorm(nrow(data), 0, 1)  # Initialize wqs
   data <- data[, c(allvars, mix_name, id)]
   dtf <- na.omit(data)
   
@@ -103,4 +104,3 @@ gwqs_re <- function(formula, data, weights, mix_name, stratified, valid_var, b =
 
   return(results)
 }
-
