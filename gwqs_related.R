@@ -1,42 +1,4 @@
-
-
-# # function to remove terms from formula
-# remove_terms <- function(form, term) {
-  # fterms <- terms(form)
-  # fac <- attr(fterms, "factors")
-  # if(term %in% rownames(fac)){
-    # fac_wqs <- fac[grep(term, rownames(fac)), ]
-    # if(NCOL(fac_wqs) == 1) idx <- which(as.logical(fac[term, ]))
-    # else idx <- which(apply(fac_wqs, 2, function(i) any(i==1)))
-    # new_fterms <- drop.terms(fterms, dropx = idx, keep.response = TRUE)
-    # return(formula(new_fterms))
-  # }
-  # else return(form)
-# }
-
-
-# # function to select variables
-# select_vars <- function(data, na.action, formula, mix_name, ...){
-  # allvars = all.vars(formula)
-  # other_vars <- c(...)
-  # data$wqs = 0
-  # data <- data[, c(allvars, mix_name, other_vars)]
-  # if(missing(na.action)) na.action <- na.omit
-  # dtf <- na_action(data, na.action)
-  # return(dtf)
-# }
-
-
-# # function to manage NAs
-# na_action <- function(data, na.action){
-  # dtf <- match.call(expand.dots = FALSE)
-  # m <- match(c("na.action", "data"), names(dtf), 0)
-  # dtf <- dtf[m]
-  # names(dtf)[2] <- "object"
-  # dtf <- eval(dtf, parent.frame())
-  # return(dtf)
-# }
-
+### Mixed-effects WQS Related Functions
 
 # function to create stratified elements in the mixture by levels of factors
 stratified_f = function(Q, dtf, stratified, mix_name){
