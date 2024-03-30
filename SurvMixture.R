@@ -1,76 +1,73 @@
 ###SurvMixture.R
 
 
-
-
-####################################################数据预处理#############################################
-setwd("E:/TAPdata")
+####################################################Data preprocessing#############################################
 cohort = read.csv("cohort_TAP_cokrige.csv", header=TRUE)
 cohort_pressure = cohort[, c("survpressureday","survpressure","TAP.cokrige.PM2.5.3","agg.cokrige.PM10.3","agg.cokrige.NO2.3","agg.cokrige.SO2.3","TAP.cokrige.O3.3","agg.cokrige.CO.3",                                             						                       
                         "age","BMI","sex","marriage","education","history.pressure","cook.group","duration.group","smoking","exercise","mask","cleaner",  
                         "diastolic","systolic",'survpressurebasetime',"pressure","UnitID","region","retire")]
 
-dat = subset(cohort_pressure, pressure == 0 & (is.na(diastolic) | diastolic < 90) & (is.na(systolic) | systolic < 140)  & retire == 0 & age >= 18 & age <= 65 & !is.na(survpressurebasetime)) # 筛选数据集
+dat = subset(cohort_pressure, pressure == 0 & (is.na(diastolic) | diastolic < 90) & (is.na(systolic) | systolic < 140)  & retire == 0 & age >= 18 & age <= 65 & !is.na(survpressurebasetime)) # Filter dataset
 # dat = subset(dat, region != 1)						
 
 update_data = function(flag = TRUE, num = 20)
-## flag = TRUE，表示删除数据集重复行；flag = FALSE，表示删除暴露变量重复行
-## num表示变量的个数，介于11~20之间
+# When flag = TRUE, it indicates that duplicate rows in the dataset should be removed; when flag = FALSE, it indicates that duplicate rows of the exposure variable should be removed. 
+# num represents the number of variables, which is between 11 and 20
 {
 	if(num > 20 | num < 11)
 	{
 	  stop("Error: num must be between 11 and 20")
 	}
 	
-	# 去掉缺失值
+	# Remove missing values
 	dat = na.omit(dat[, 1:num])   	
 	if(flag == TRUE)
 	{
-		dupidx = which(duplicated(dat))  # 数据集重复行下标
+		dupidx = which(duplicated(dat))  # Duplicate row indices in the dataset
 		if( length(dupidx) > 0)
 		{
-			dat = dat[-dupidx, ]  # 去掉重复行
+			dat = dat[-dupidx, ]  # Remove duplicate rows
 		}
 	} else {
-		dupidx = which(duplicated(dat[, 3:8]))  # 暴露变量重复行下标
+		dupidx = which(duplicated(dat[, 3:8]))  # Exposure variables duplicate rows
 		if( length(dupidx) > 0)
 		{
-			dat = dat[-dupidx, ]  # 去掉重复行
+			dat = dat[-dupidx, ]  # Remove duplicate rows
 		}
 	}
 
 	if(num >= 19)
 	{
-		##修改mask类别
-		dat$mask[dat$mask == 1] = 0  #不戴或偶尔戴口罩
-		dat$mask[dat$mask == 2] = 1  #经常戴口罩
+		# Modify the mask category
+		dat$mask[dat$mask == 1] = 0  # not wearing or occasionally wearing a mask
+		dat$mask[dat$mask == 2] = 1  # frequently wearing a mask
 	}
 
-	##单位转换
+	# Unit conversion
 	colnames(dat)[3:8] = c('PM2.5', 'PM10', 'NO2', 'SO2', 'O3', 'CO')
-	dat[, 3:8] = dat[, 3:8] * 10  #单位转换为μg/m³
-	dat$NO2 = dat$NO2 / 1.914  #单位转换为ppb
-	dat$SO2 = dat$SO2 / 2.660  #单位转换为ppb
-	dat$O3 = dat$O3 / 1.9957   #单位转换为ppb, part per billion	
-	dat$CO = dat$CO / 1.165  #单位转换为ppb	
+	dat[, 3:8] = dat[, 3:8] * 10  # μg/m³
+	dat$NO2 = dat$NO2 / 1.914  # ppb
+	dat$SO2 = dat$SO2 / 2.660  # ppb
+	dat$O3 = dat$O3 / 1.9957   # ppb, part per billion	
+	dat$CO = dat$CO / 1.165  # ppb	
 	
-	# 排除异常样本
-	dat[, 3:10] = scale(dat[, 3:10])  # 暴露变量和连续协变量标准化
+	# Exclude outlier samples
+	dat[, 3:10] = scale(dat[, 3:10])  # Standardize the exposure variable and continuous covariates
 	outidx = lapply(dat[, 3:10], function(x) { idx = which(x < -3 | x > 3) })
 	outidx = do.call(c, outidx)
-	outidx = unique(outidx)  # 排除3倍标准差之外样本
+	outidx = unique(outidx)  # Exclude samples outside three times the standard deviation
 	dat = dat[-outidx, ]
 
-	# # 排除出现次数少的类别
-	# ID = as.character(dat$UnitID)  # 随机效应
+	# # Exclude categories with few occurrences
+	# ID = as.character(dat$UnitID)  # random effect
 	# tab = table(ID)
 	# IDname = names(tab)[tab < 5]
-	# IDidx = which(ID %in% IDname)  # 排除出现次数小于5的单位
+	# IDidx = which(ID %in% IDname)  # Exclude workplaces with frequency less than 5
 	# dat = dat[-IDidx, ]
 	
-	# 离散协变量转虚拟变量
-	dat[, 11:num] = lapply(dat[, 11:num], as.factor)  # 离散协变量
-	dummy = model.matrix(~., data=dat[, 11:num])  #将分类变量转化为虚拟变量, 去掉了缺失值
+	# Discrete covariate to dummy variable
+	dat[, 11:num] = lapply(dat[, 11:num], as.factor)  # Discrete covariate
+	dummy = model.matrix(~., data=dat[, 11:num])  # Categorical variables converted to dummy variables, missing values removed
 	dummy = dummy[, -1]
 
 	colnames(dat)[1:2] = c('time', 'status')
@@ -78,38 +75,38 @@ update_data = function(flag = TRUE, num = 20)
 	return(list(dat=dat, dummy=dummy))
 }
 
-lst = update_data(flag=FALSE, num=14)  # 选择离散变量sex, marriage, education, history.pressure
+lst = update_data(flag=FALSE, num=14)  # select discrete covariate: sex, marriage, education, history.pressure
 
 
-## 分析数据集
+## Analyze dataset
 pollutants = c("PM2.5", "PM10", "NO2", "SO2", "O3", "CO")
 # covarnames = names(lst$dat)[9:ncol(lst$dat)]
 covarnames = c('age', 'BMI', colnames(lst$dummy))
 
-X = as.matrix(lst$dat[, pollutants])  # 暴露变量
-time = lst$dat$time  # 生存时间
-status = lst$dat$status  # 生存状态
-Z = as.matrix(cbind(lst$dat[, c('age', 'BMI')], lst$dummy))  # 协变量
+X = as.matrix(lst$dat[, pollutants])  # exposure variables
+time = lst$dat$time  # survival time
+status = lst$dat$status  # survival status
+Z = as.matrix(cbind(lst$dat[, c('age', 'BMI')], lst$dummy))  # covariates
 
 comp_dat = data.frame(cbind(time=time, status=status, X=X, Z=Z))
 	
 
-#################################################数据分析#################################################
+#################################################Data analysis#################################################
 f_linear = paste(paste(pollutants, collapse = "+"), paste(covarnames, collapse = "+"), sep="+")
 formula = as.formula(paste("Surv(time, status) ~", f_linear))
 
 inter = inter_irf(formula, pollutants, comp_dat, q=10)  # "NO2+_O3+"   "O3+_PM2.5+"  "O3+_PM10+"  "PM10+_PM2.5+" "O3+_SO2+"   "CO+_O3+" 
 
 f_quad = paste(c('I(age^2)', 'I(BMI^2)'), collapse = "+")
-f_inter = gsub("\\+_", ":", inter$inter) # 替换中间的"+_"为":"
-f_inter = sub("\\+$", "", f_inter)  # 替换最后的"+"为""
+f_inter = gsub("\\+_", ":", inter$inter) # Replace the "+_" in the middle with ":"
+f_inter = sub("\\+$", "", f_inter)  # Replace the last "+" with ""
 f_inter = paste(f_inter, collapse = "+")
 
 # fit1 = qgcomp.cox.noboot(formula2, expnms=pollutants, data=comp_dat, q=10)
 # fit2 = qgcomp.cox.boot(formula2, expnms=pollutants, data=comp_dat, q=10, B=10, MCsize=1000, parallel=TRUE, parplan=TRUE, degree=2)
 
 
-finalvar = select_vars(f_linear, f_quad, f_inter)  # 变量筛选
+finalvar = select_vars(f_linear, f_quad, f_inter)  # Variable selection
 finalvar = paste(names(finalvar), collapse = "+")
 formula2 = as.formula(paste("Surv(time, status) ~", paste(f_linear, finalvar, sep="+")))
 
@@ -149,7 +146,6 @@ select_vars = function(f_linear, f_quad, f_inter)
 
 
 
-
 #################################################qgcomp#################################################
 library(qgcomp)
 library(survival)
@@ -158,26 +154,26 @@ qdat = simdata_quantized(
      outcometype="survival", 
      n=1000, corr=c(.9,.3), coef=c(1,1,0,0), 
      q = 10, shape0=0.5, scale0=10, censtime=0.01
-)  # 左偏
+)  # Left skewed
 
 
 qdat = simdata_quantized(
      outcometype="survival", 
      n=1000, corr=c(.9,.3), coef=c(1,1,0,0), 
      q = 10, shape0=1, scale0=10, censtime=0.1
-)  # 指数分布
+)  # Exponential distribution 
 
 qdat = simdata_quantized(
      outcometype="survival", 
      n=1000, corr=c(.9,.3), coef=c(1,1,0,0), 
      q = 10, shape0=2, scale0=10, censtime=0.5
-)  # Rayleigh 分布
+)  # Rayleigh distribution
 
 qdat = simdata_quantized(
      outcometype="survival", 
      n=1000, corr=c(.9,.3), coef=c(1,1,0,0), 
      q = 10, shape0=20, scale0=10, censtime=15
-)  # 极值分布
+)  # Extreme value distribution
 
 
 data(metals)
@@ -219,7 +215,7 @@ smp = extract.subsample(smp, raw=TRUE, standardize=FALSE)
 
 
 
-#################################################模拟数据分析#################################################
+#################################################Simulation data analysis#################################################
 library(qgcomp)
 library(randomForestSRC)
 library(iRF)
@@ -227,7 +223,7 @@ library(future)
 library(future.apply)
 
 
-#####################################相关函数#########################################
+#####################################Correlation functions#########################################
 
 rfqgc_surv = function(formula, expos, data, q=NULL, seed=123, degree=1)
 {
@@ -268,7 +264,7 @@ swap = function(dat)
 	{
 	  if(!is.na(dat[2, i]))
 	  {
-		if(dat[2, i] > dat[3, i])  # 互换第2和第3行
+		if(dat[2, i] > dat[3, i])  # Interchange rows 2 and 3
 		{
 		   temp = dat[2, i]
 		   dat[2, i] = dat[3, i]
@@ -276,10 +272,10 @@ swap = function(dat)
 		}
 	    if(dat[1, i] < dat[2, i])     
 	    {
-          dat[2, i] = dat[1, i] - 1e-5  # 修改下界   
+          dat[2, i] = dat[1, i] - 1e-5  # Modify lower bound
       } else if(dat[1, i] > dat[3, i])
       {
-          dat[3, i] = dat[1, i] + 1e-5  # 修改上界            
+          dat[3, i] = dat[1, i] + 1e-5  # Modify upper bound             
       }		  
 	  }
 	}
@@ -402,10 +398,10 @@ fit_irf = function(ntrain, vars, data, n, seed)
 }
 
 
-####################################正确识别交互作用####################################
+####################################Correctly identify interaction effects####################################
 expos = paste0('x', 1:4)
 formula = as.formula(Surv(time, status) ~ x1 + x2 + x3 + x4)
-formula2 = as.formula(Surv(time, status) ~ x1 + x2 + x3 + x4 + I(x1^2) + x2:x3)  # 真实模型
+formula2 = as.formula(Surv(time, status) ~ x1 + x2 + x3 + x4 + I(x1^2) + x2:x3)  # true model
 
 
 fit = qgcomp.cox.noboot(Surv(time, status) ~ x1 + x2 + x3 + x4 + I(x1^2) + x2:x3 , expnms=expos, data=dat1, q=NULL)
@@ -449,19 +445,19 @@ write.csv(coefs, "coefs1_8.csv")
 
 
 
-####################################错误识别交互作用####################################
+####################################Incorrectly identify interaction effects####################################
 expos = paste0('x', 1:4)
 formula = as.formula(Surv(time, status) ~ x1 + x2 + x3 + x4)
-formula3 = as.formula(Surv(time, status) ~ x1 + x2 + x3 + x4 + x1:x2)  # 真实模型
+formula3 = as.formula(Surv(time, status) ~ x1 + x2 + x3 + x4 + x1:x2)  # true model
 formula3_f = as.formula(Surv(time, status) ~ x1 + x2 + x3 + x4 + x1:x3) 
 
-formula4 = as.formula(Surv(time, status) ~ x1 + x2 + x3 + x4 + x1:x2 + x2:x3)  # 真实模型
+formula4 = as.formula(Surv(time, status) ~ x1 + x2 + x3 + x4 + x1:x2 + x2:x3)  # true model
 formula4_f = as.formula(Surv(time, status) ~ x1 + x2 + x3 + x4 + x1:x3 + x3:x4)  
 
-formula5 = as.formula(Surv(time, status) ~ x1 + x2 + x3 + x4 + x1:x2 + x2:x3 + x2:x4)  # 真实模型
+formula5 = as.formula(Surv(time, status) ~ x1 + x2 + x3 + x4 + x1:x2 + x2:x3 + x2:x4)  # true model
 formula5_f = as.formula(Surv(time, status) ~ x1 + x2 + x3 + x4 + x1:x2 + x1:x3 + x3:x4)
 
-formula6 = as.formula(Surv(time, status) ~ x1 + x2 + x3 + x4 + x1:x2 + x2:x3 + x2:x4 + x3:x4)  # 真实模型
+formula6 = as.formula(Surv(time, status) ~ x1 + x2 + x3 + x4 + x1:x2 + x2:x3 + x2:x4 + x3:x4)  # true model
 formula6_f = as.formula(Surv(time, status) ~ x1 + x2 + x3 + x4 + x1:x3 + x2:x3 + x3:x4)
 
 
