@@ -1,4 +1,4 @@
-### Mixed-effects WQS Related Functions
+### Functions Related to Mixed-Effects Weighted Quantile Sum (WQS) Regression
 
 # function to create stratified elements in the mixture by levels of factors
 stratified_f = function(Q, dtf, stratified, mix_name){
