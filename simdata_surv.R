@@ -141,7 +141,7 @@ is_lower_triangular = function(mat) {
 
 
 
-# 正确识别交互作用
+# Correctly identify interaction effects
 imat = matrix(c(0.20, 0, 0, 0,
                 0, 0, 0, 0,
                 0, 0.15, 0, 0,
@@ -179,7 +179,7 @@ set.seed(123)
 dat8 = simdata_surv(N=500, coef=c(0.50, -0.25, 0, 0), corr=0.75, q=10, shape0=4, scale0=12, censtime=0.1, mat=imat)
 
 
-# 错误识别交互作用
+# Incorrectly identify interaction effects
 imat1 = matrix(c(0, 0, 0, 0,
                 0.20, 0, 0, 0,
                 0, 0, 0, 0,
@@ -224,6 +224,4 @@ dat15 = simdata_surv(N=500, coef=c(0.50, 0.25, 0, 0), corr=0.75, q=10, shape0=5,
 set.seed(123)
 dat16 = simdata_surv(N=500, coef=c(0.50, -0.25, 0, 0), corr=0.75, q=10, shape0=5, scale0=11, censtime=0.7, mat=imat4)
 
-
-				 
-				 
+				 				
