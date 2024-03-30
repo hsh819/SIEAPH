@@ -1,4 +1,3 @@
-###混合物分析
 ###AnaMixture.R
 
 
@@ -11,17 +10,6 @@ library(bsmim2)
 
 
 ####################################################数据预处理#############################################
-# setwd("E:/BaiduNetdiskDownload/TAP数据/TAP_Baseline")
-# setwd("E:/TAPdata/TAP_Baseline")
-# baseline = read.csv("baseline_local_cokrige2.csv",header=TRUE)
-# baseline_glucose = baseline[, c("glucose","local.cokrige.PM2.5.3","agg.cokrige.PM10.3","agg.cokrige.NO2.3","agg.cokrige.SO2.3","local.cokrige.O3.3","agg.cokrige.CO.3",                            
-                               # "age","BMI","sex","marriage","education","history.diabetes","cook.group","duration.group","smoking","exercise","mask","cleaner",
-                               # "IFG","region","UnitID","diabetes","retire")]
-
-# dat = subset(baseline_glucose, diabetes == 0 & retire == 0 & age <= 65 & age >= 18 & !is.na(IFG))  # 筛选数据集
-
-
-setwd("E:/BaiduNetdiskDownload/TAP数据")
 setwd("E:/TAPdata")
 cohort = read.csv("cohort_TAP_cokrige.csv", header=TRUE)
 cohort_glucose = cohort[, c("glucose","TAP.cokrige.PM2.5.3","agg.cokrige.PM10.3","agg.cokrige.NO2.3","agg.cokrige.SO2.3","TAP.cokrige.O3.3","agg.cokrige.CO.3",                                             						                       
@@ -209,9 +197,9 @@ rownames(wqs_weights) = c("rh1", "rh100", "valid0")
 write.csv(t(wqs_weights), "wqs_coef_weights.csv")	
 
 
-##############基于随机效应gwqs##############
-source("C:/Users/Administrator/Documents/SIEAPH/gwqs_re.R")
-source("C:/Users/Administrator/Documents/SIEAPH/gwqs_related.R")
+##############随机效应gwqs##############
+source("gwqs_re.R")
+source("gwqs_related.R")
 results1.4 = gwqs_re(formulas2, mix_name = pollutants, data = lst$dat, q = 10, validation = 0.6, b = 100, 
                 b1_pos = TRUE, b1_constr = TRUE, family = gaussian, id = 'ID', seed = 123, plan_strategy = "multisession")  #连续，调整模型，正约束
 pval1 = 2*pnorm(-abs(summary(results1.4$fit)$coef[, 3]))
@@ -334,151 +322,6 @@ write.csv(res21, file="qgcomp_coefs.csv")
 write.csv(res22, file="qgcomp_weights.csv", row.names=FALSE)
 
 
-#################################################gcdnet#################################################
-library(gcdnet)
-library(foreach)
-library(doParallel)
-library(lmerTest)
-
-
-cv_lambda = function(data, is.covar=FALSE, is.gauss=TRUE, seed=123)
-{
-	if(is.covar)
-	{
-		pf = c(1,1,1,1,1,1, rep(0, ncol(data$Z)))  # 保留所有协变量
-		pf2 = pf	
-	}
-	else
-	{
-		pf = c(1,1,1,1,1,1)  # L1惩罚因子
-		pf2 = pf  # L2惩罚因子		
-	}
-	
-	# 生成候选lambda序列
-	lambda2 = seq(from=1e-4, to=1e-3, len=10)
-
-	cores = detectCores(logical = FALSE) - 1
-	cl = makeCluster(cores) 
-	registerDoParallel(cl)
-	# 并行网格搜索
-	cv_results = foreach(i=lambda2, .combine='rbind', .inorder=FALSE, .packages='gcdnet') %dopar% 
-	{
-
-	  set.seed(seed)
-	  if(is.covar == F & is.gauss == T)
-	  {
-	    cv = cv.gcdnet(data$X, data$y, method="ls", lambda2=i, pf=pf, pf2=pf2, pred.loss="loss", nfolds=10)  # 连续响应, 不包括协变量
-	  }
-	  else if(is.covar == F & is.gauss == F)
-	  {
-	    cv = cv.gcdnet(data$X, data$ybin, method="logit", lambda2=i, pf=pf, pf2=pf2, pred.loss="loss", nfolds=10)  # 离散响应, 不包括协变量  
-	  }
-	  else if(is.covar == T & is.gauss == T)
-	  {
-	    cv = cv.gcdnet(cbind(data$X, data$Z), data$y, method="ls", lambda2=i, pf=pf, pf2=pf2, pred.loss="loss", nfolds=10)  # 连续响应，包括协变量 	  
-	  }
-	  else
-	  {
-	    cv = cv.gcdnet(cbind(data$X, data$Z), data$ybin, method="logit", lambda2=i, pf=pf, pf2=pf2, pred.loss="loss", nfolds=10)  # 离散响应，包括协变量  	  
-	  }
-
-	  idx = which.min(cv$lambda)
-	  # 返回误差
-	  return(c(lambda=cv$lambda.min, lambda2=i, error=cv$cvm[idx]))
-	  
-	}
-	stopCluster(cl)
-
-	# 最佳参数
-	best_idx = which.min(cv_results[, 3])
-	best_lambda = cv_results[best_idx, ]
-	set.seed(seed)
-	if(is.covar == F & is.gauss == T)
-	{
-	  cv = cv.gcdnet(data$X, data$y, method="ls", lambda=best_lambda[1], lambda2=best_lambda[2], pf=pf, pf2=pf2, pred.loss="loss", nfolds=10)  # 连续响应, 不包括协变量  	  
-	  beta = cv$gcdnet.fit$beta
-	}
-	else if(is.covar == F & is.gauss == F)
-	{
-	  cv = cv.gcdnet(data$X, data$ybin, method="logit", lambda=best_lambda[1], lambda2=best_lambda[2], pf=pf, pf2=pf2, pred.loss="loss", nfolds=10)  # 离散响应, 不包括协变量  	  
-	  beta = cv$gcdnet.fit$beta	  
-	}
-	else if(is.covar == T & is.gauss == T)
-	{
-	  cv = cv.gcdnet(cbind(data$X, data$Z), data$y, method="ls", lambda=best_lambda[1], lambda2=best_lambda[2], pf=pf, pf2=pf2, pred.loss="loss", nfolds=10)  # 连续响应，包括协变量  
-	  beta = cv$gcdnet.fit$beta[1:6, ]	  
-	}
-	else
-	{
-	  cv = cv.gcdnet(cbind(data$X, data$Z), data$ybin, method="logit", lambda=best_lambda[1], lambda2=best_lambda[2], pf=pf, pf2=pf2, pred.loss="loss", nfolds=10)  # 离散响应，包括协变量  
-	  beta = cv$gcdnet.fit$beta[1:6, ]
-	}	
-	
-	return( rbind(as.matrix(best_lambda), as.matrix(beta)))
-
-}
-
-best_fit1 = cv_lambda(data=comp_dat, is.covar=FALSE, is.gauss=TRUE)  # 连续响应, 不包括协变量
-best_fit2 = cv_lambda(data=comp_dat, is.covar=FALSE, is.gauss=FALSE)  # 离散响应, 不包括协变量
-best_fit3 = cv_lambda(data=comp_dat, is.covar=TRUE, is.gauss=TRUE)  # 连续响应，包括协变量
-best_fit4 = cv_lambda(data=comp_dat, is.covar=TRUE, is.gauss=FALSE)  # 离散响应，包括协变量 
-best_fit = cbind(best_fit1, best_fit2, best_fit3, best_fit4)
-colnames(best_fit) = paste(rep(c('gauss', 'binom'), 2), rep(c('nocovar', 'covar'), each=2), sep="_")
-
-formulas9 = as.formula(paste("y ~", paste("ERS", "(1|ID)", sep="+")))  # 连续响应，不包括协变量
-formulas10 = as.formula(paste("ybin ~", paste("ERS", "(1|ID)", sep="+")))  # 离散响应，不包括协变量
-formulas11 = as.formula(paste("y ~", paste("ERS", paste(colnames(comp_dat$Z), collapse = "+"), "(1|ID)", sep="+")))  # 连续响应，包括协变量
-formulas12 = as.formula(paste("ybin ~", paste("ERS", paste(colnames(comp_dat$Z), collapse = "+"), "(1|ID)", sep="+")))  # 离散响应，包括协变量
-
-ERS = function(data, is.covar=FALSE, is.gauss=TRUE)
-{
-
-	X_q = apply(data$X, 2, function(x) {
-	   qs = quantile(x, probs = seq(0, 1, 0.1))
-	   y = cut(x, breaks=qs, include.lowest=TRUE, labels=0:9)  # 转为10分位数组，用0-9表示
-	   y = as.numeric(as.character(y))	   
-	})
-		
-	if(is.covar == F & is.gauss == T)
-	{
-	  ERS = as.vector(X_q %*% best_fit1[4:9, ])
-	  fit =  lmer(formulas9, data=data.frame(ERS, y=data$y, ID=data$ID))  # 连续响应，不包括协变量
-	  beta = summary(fit)$coef[, -3]  # 去掉df
-	}
-	else if(is.covar == F & is.gauss == F)
-	{
-	  ERS = as.vector(X_q %*% best_fit2[4:9, ])
-	  fit =  glmer(formulas10, data=data.frame(ERS, ybin=data$ybin, ID=data$ID), family=binomial)  # 离散响应，不包括协变量	    
-	  beta = summary(fit)$coef
-	}
-	else if(is.covar == T & is.gauss == T)
-	{
-	  ERS = as.vector(X_q %*% best_fit3[4:9, ])
-	  fit =  lmer(formulas11, data=data.frame(ERS, data$Z, y=data$y, ID=data$ID))  # 连续响应, 包括协变量	  
-	  beta = summary(fit)$coef[1:2, -3]  # 去掉df
-	}
-	else
-	{
-	  ERS = as.vector(X_q %*% best_fit4[4:9, ])
-	  fit =  glmer(formulas12, data=data.frame(ERS, data$Z, ybin=data$ybin, ID=data$ID), family=binomial)  # 离散响应, 包括协变量    	  
-	  beta = summary(fit)$coef[1:2, ]
-	}
-	return(beta)
-	
-}
-
-ERS1 = ERS(comp_dat, is.covar=FALSE, is.gauss=TRUE)  # 连续响应，不包括协变量
-ERS2 = ERS(comp_dat, is.covar=FALSE, is.gauss=FALSE)  # 离散响应，不包括协变量
-ERS3 = ERS(comp_dat, is.covar=TRUE, is.gauss=TRUE)  # 连续响应, 包括协变量
-ERS4 = ERS(comp_dat, is.covar=TRUE, is.gauss=FALSE)  # 离散响应, 包括协变量
-
-ERS_beta = rbind(ERS1, ERS2, ERS3, ERS4)
-ERSname = rep(paste(rep(c('gauss', 'binom'), 2), rep(c('nocovar', 'covar'), each=2), sep='_'), each=2)
-rownames(ERS_beta) = paste(ERSname, rownames(ERS_beta), sep='_')
-
-write.csv(best_fit, file="gcdnet_beta.csv")
-write.csv(ERS_beta, file="gcdnet_ERS.csv")
-
 
 #################################################bkmr#################################################
 # remotes::install_github("jenfb/bkmr")
@@ -510,17 +353,11 @@ set.seed(R)
 fitkm = kmbayes_parallel(nchains=ncores, y=kmdat$y, Z=kmdat$Z, X=kmdat$X, id=kmdat$ID, iter = ceiling(R/ncores), verbose = TRUE, varsel = TRUE, control.params = list(r.jump2 = 0.5))  # 连续响应，包括协变量，提高M-H算法接收率 
 # fitpr = kmbayes_parallel(nchains=ncores, y=kmdat$ybin, Z=kmdat$Z, X=kmdat$X, id=kmdat$ID, iter = ceiling(R/ncores), verbose = TRUE, varsel = TRUE, family="binomial", control.params = list(r.jump2 = 0.5))  # 离散响应，包括协变量，提高M-H算法接收率 
 
-# 分组：PM2.5和PM10, NO2, SO2, O3和CO, groups = c(1,1,2,2,2,2)
-# fitkm = kmbayes_parallel(nchains=ncores, y=kmdat$y, Z=kmdat$Z, X=kmdat$X, id=kmdat$ID, iter = ceiling(R/ncores), verbose = TRUE, varsel = TRUE, groups = c(1,1,2,2,2,2), control.params = list(r.jump2 = 0.5))  # 连续响应，包括协变量，层次变量选择，提高M-H算法接收率 
-# fitpr = kmbayes_parallel(nchains=ncores, y=kmdat$ybin, Z=kmdat$Z, X=kmdat$X, id=kmdat$ID, iter = ceiling(R/ncores), verbose = TRUE, varsel = TRUE, groups = c(1,1,2,2,2,2), family="binomial", control.params = list(r.jump2 = 0.5))  # 离散响应，包括协变量，层次变量选择，提高M-H算法接收率 
 
 diftime = proc.time() - start
 print(paste("Execution time:", round(diftime[3]/3600,2), "hours"))
 
 #########################################################
-setwd("E:/BaiduNetdiskDownload/TAP数据")
-setwd("E:/TAPdata")
-
 # load(file="BKMRHAT_fitkmcomb_10000.RData")
 load(file="BKMRHAT_fitkmcomb_20000.RData")
 
