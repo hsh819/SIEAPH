@@ -16,16 +16,16 @@ library(marginaleffects)
 start = proc.time()
 
 future::plan(future::multisession, workers = 20)
-span = 1 # 间隔
+span = 1 # Interval
 MMD = future_lapply(1:100, future.seed=TRUE, FUN=function(x) {
 	compute_min_MMD(x, is.synthetic=TRUE, interval=span)
 })
 future::plan(future::sequential)
 
-MMD = MMD[!sapply(MMD, is.null)]  # 去掉空元素
+MMD = MMD[!sapply(MMD, is.null)]  # Remove empty elements
 
 
-# future_lapply并行
+# future_lapply parallel
 dimension = c(2, 6, seq(10, 100, by=10))
 
 future::plan(future::multisession)
@@ -51,7 +51,7 @@ result4 = future_lapply(dimension, future.seed=TRUE, FUN=function(d) {
     estimate_ATT(method = 'kdrm', d = d, replace=TRUE, B=100, MMD=MMD)  
 })
 
-future::plan(future::sequential)  # 关闭进程
+future::plan(future::sequential)  # Close process
 
 result4 = do.call(rbind, result4)
 result = rbind(result, result4)
@@ -75,16 +75,16 @@ library(marginaleffects)
 start = proc.time()
 
 future::plan(future::multisession, workers = 20)
-span = 1 # 间隔
+span = 1 # Interval
 MMD = future_lapply(1:100, future.seed=TRUE, FUN=function(x) {
   compute_min_MMD(x, is.synthetic=FALSE, interval=span)
 })
 future::plan(future::sequential)
 
-MMD = MMD[!sapply(MMD, is.null)]  # 去掉空元素
+MMD = MMD[!sapply(MMD, is.null)]  # Remove empty elements
 
 
-# future_lapply并行
+# future_lapply parallel
 dimension = 2:7
 
 future::plan(future::multisession)
@@ -110,7 +110,7 @@ result4 = future_lapply(dimension, future.seed=TRUE, FUN=function(d) {
     error_ATT(method = 'kdrm', d = d, replace=FALSE, B=100, MMD=MMD)  
 })
 
-future::plan(future::sequential)  # 关闭进程
+future::plan(future::sequential)  # Close process
 
 result4 = do.call(rbind, result4)
 result = rbind(result, result4)
