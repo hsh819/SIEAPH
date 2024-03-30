@@ -118,6 +118,3 @@ write.csv(result, "~/Rdata/Causeffect_Austin.csv", row.names=F)
 
 diftime = proc.time() - start
 print(paste("Execution time:", round(diftime[3]/60, 2), "minutes"))
-
-
-
