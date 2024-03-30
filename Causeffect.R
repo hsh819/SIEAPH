@@ -1,4 +1,3 @@
-###因果效应估计
 ###Causeffect.R
 
 # If the target of inference is the ATE, optimal or generalized full matching, subclassification, or profile matching can be used. 
@@ -460,114 +459,6 @@ pca_ATT = function(dat, d, replace=TRUE, formula.select=1, distance="euclidean",
 	}	
 }
 
-umap_ATT = function(dat, d, iter, replace=TRUE, formula.select=1, distance="euclidean", is.m=FALSE) {
-	# UMAP
-	newnames = paste0("UM", 1:d)	
-	formula31 = as.formula(paste("T ~", paste0(newnames, collapse="+")))		
-	if(formula.select == 1) {
-		formula32 = as.formula(paste("T ~", paste0(setdiff(names(dat), c('T', 'Y')), collapse="+")))	
-		formula4 = as.formula(paste("Y ~ T", paste0(newnames, collapse="+"), sep="+"))		
-	} else if(formula.select == 2) {
-		formula32 = as.formula(paste("T ~", paste0(setdiff(names(dat), c('T', 'Y')), collapse="+")))
-		formula4 = as.formula(paste("Y ~ T", paste0(setdiff(names(dat), c('T', 'Y')), collapse="+"), sep="+"))	
-	} else if(formula.select == 3) {
-		formula32 = as.formula(paste("T ~", paste0(setdiff(names(dat), c('T', 'Y')), collapse="+")))	
-		formula4 = as.formula(paste("Y ~ T", paste0(setdiff(names(dat), c('T', 'Y')), collapse="+"), paste0(newnames, collapse="+"), sep="+"))			
-	} else if(formula.select == 4) {
-		if( all(c('age', 'education', 're74', 're75', 'un74', 'hispanic') %in% names(dat)) ) {
-			newvar = paste('I(age^2)', 'I(age^3)', 'I(education^2)', 'I(re74^2)', 'I(re75^2)', 'education:re74', 'un74:hispanic', sep="+")		
-		} else if( all(c('age', 'education', 're75', 'un75', 'hispanic') %in% names(dat)) ) {
-			newvar = paste('I(age^2)', 'I(age^3)', 'I(education^2)', 'I(re75^2)', 'education:re75', 'un75:hispanic', sep="+")			
-		} else {
-			newvar = NULL
-		}
-		formula32 = as.formula(paste("T ~", paste(paste0(newnames, collapse="+"), newvar, sep="+")))	
-		formula4 = as.formula(paste("Y ~ T", paste0(setdiff(names(dat), c('T', 'Y')), collapse="+"), paste0(newnames, collapse="+"), newvar, sep="+"))					
-	} else if(formula.select == 5) {
-		if( all(c('PM10', 'NO2', 'SO2', 'O3', 'CO', 'age', 'BMI', 'sex1', 'education1', 'education2', 'history1', 'history2') %in% names(dat)) ) {
-			newvar = paste('I(PM10^2)', 'I(NO2^2)', 'I(SO2^2)', 'I(O3^2)', 'I(CO^2)', 'I(age^2)', 'I(BMI^2)',   # 'PM10^2', 'NO2^2', 'SO2^2', 'O3^2', 'CO^2', 'age^2', 'BMI^2'
-							'age:BMI', 'age:sex1', 'age:education1', 'age:education2', 'BMI:sex1', 'SO2:education1', 'SO2:education2', 'T:age', 'T:BMI', 'T:sex1',
-							'O3:CO', 'O3:PM10', 'O3:SO2', sep="+")						
-		} else {
-			newvar = NULL
-		}				
-		formula32 = as.formula(paste("T ~", paste0(setdiff(names(dat), c('T', 'Y')), collapse="+")))	
-		formula4 = as.formula(paste("Y ~ T", paste0(setdiff(names(dat), c('T', 'Y')), collapse="+"), paste0(newnames, collapse="+"), newvar, sep="+"))
-	}	
-	
-	N = ncol(dat) - 2
-	custom.config = umap.defaults
-	custom.config$random_state = ifelse(is.logical(iter), N, iter + 99)
-	custom.config$n_components = d
-	custom.config$metric = 'euclidean'  # euclidean, manhattan, cosine, pearson, pearson2          		  
-	umap.dist = umap(dat[, 1:N], config=custom.config, input="data")
-	layout = umap.dist$layout
-	colnames(layout) = newnames	
-	dat = cbind(dat, layout)	
-	
-	# Matching: euclidean, scaled_euclidean, mahalanobis, robust_mahalanobis, cosine
-	if(formula.select != 5) {
-		m = matchit(formula32, data = dat, method = "nearest", distance = distance, replace=replace)			
-	} else if(formula.select == 5) {
-		if(distance == 'euclidean') {
-			Dist = euclidean_dist(formula31, data = dat)
-			m = matchit(formula32, data = dat, method = "nearest", distance = Dist, replace=replace)
-		} else if(distance == 'scaled_euclidean') {
-			Dist = scaled_euclidean_dist(formula31, data = dat)
-			m = matchit(formula32, data = dat, method = "nearest", distance = Dist, replace=replace)  	
-		} else if(distance == 'mahalanobis') {
-			Dist = mahalanobis_dist(formula31, data = dat)
-			m = matchit(formula32, data = dat, method = "nearest", distance = Dist, replace=replace)  
-		} else if(distance == 'robust_mahalanobis') {
-			Dist = robust_mahalanobis_dist(formula31, data = dat)
-			m = matchit(formula32, data = dat, method = "nearest", distance = Dist, replace=replace) 
-		} else if(distance == 'cosine') {
-			Dist = cosine_dist(formula31, data = dat)
-			m = matchit(formula32, data = dat, method = "nearest", distance = Dist, replace=replace) 	
-		} else {
-			stop('distance input error')
-		}	
-	}
-		
-	if(replace) {
-		m.data = get_matches(m)
-		if(length(unique(dat$Y)) != 2)  # 连续响应变量
-		{
-			fit = lm(formula4, data = m.data, weights = weights)
-			ATT = avg_comparisons(fit, variables = "T", vcov = ~ subclass + id, newdata = subset(m.data, T == 1), wts = "weights")				
-		} else {  # 二分类响应变量
-			fit = glm(formula4, data = m.data, weights = weights, family = quasibinomial())
-			ATT_lnRR = avg_comparisons(fit, variables = "T", vcov = ~ subclass + id, newdata = subset(m.data, T == 1), wts = "weights", comparison = "lnratioavg")  # transform = "exp", logRR					
-			ATT_lnOR = avg_comparisons(fit, variables = "T", vcov = ~ subclass + id, newdata = subset(m.data, T == 1), wts = "weights", comparison = "lnoravg")  # logOR					
-		}	
-	} else {
-		m.data = match.data(m)
-		if(length(unique(dat$Y)) != 2)  # 连续响应变量
-		{
-			fit = lm(formula4, data = m.data, weights = weights)
-			ATT = avg_comparisons(fit, variables = "T", vcov = ~ subclass, newdata = subset(m.data, T == 1), wts = "weights")				
-		} else {  # 二分类响应变量
-			fit = glm(formula4, data = m.data, weights = weights, family = quasibinomial())
-			ATT_lnRR = avg_comparisons(fit, variables = "T", vcov = ~ subclass, newdata = subset(m.data, T == 1), wts = "weights", comparison = "lnratioavg")  # transform = "exp", logRR	
-			ATT_lnOR = avg_comparisons(fit, variables = "T", vcov = ~ subclass, newdata = subset(m.data, T == 1), wts = "weights", comparison = "lnoravg")  # logOR			
-		}
-	}
-	
-	# Reporting results
-	if(length(unique(dat$Y)) != 2) {		
-		res = c(ATT$estimate, ATT$std.error, ATT$conf.low, ATT$conf.high)	
-	} else {
-		lnRR = c(ATT_lnRR$estimate, ATT_lnRR$std.error, ATT_lnRR$conf.low, ATT_lnRR$conf.high)
-		lnOR = c(ATT_lnOR$estimate, ATT_lnOR$std.error, ATT_lnOR$conf.low, ATT_lnOR$conf.high)	
-		res =  rbind(lnRR, lnOR)
-		rownames(res) = paste('umap', c('lnRR', 'lnOR'), sep='_')
-	}
-	if(is.m) {
-		return(list(res=res, m=m))
-	} else {
-		return(res)		
-	}	
-}
 
 # cosine_dist = function(df) {
   
@@ -785,9 +676,6 @@ estimate_ATT = function(method, d=2, replace=TRUE, B=500, N=1000, MMD=list(), in
 
 	} else if(method == 'pca') {
 		res = pca_ATT(dat, d=d, replace=replace, formula.select=1)  
-
-	} else if(method == 'umap') {
-		res = umap_ATT(dat, d=d, iter=x, replace=replace, formula.select=1)  
 		
 	} else if(method == 'kdrm') {
 		res = kdrm_ATT(dat, d=d, iter=x, replace=replace, formula.select=1, MMD=MMD, interval=interval)  
@@ -828,9 +716,6 @@ error_ATT = function(method, d=2, replace=TRUE, B=500, N=2000, MMD=list(), inter
 
 	} else if(method == 'pca') {
 		res = pca_ATT(dat, d=d, replace=replace, formula.select=3)  
-
-	} else if(method == 'umap') {
-		res = umap_ATT(dat, d=d, iter=x, replace=replace, formula.select=3)  
 		
 	} else if(method == 'kdrm') {
 		res = kdrm_ATT(dat, d=d, iter=x, replace=replace, formula.select=3, MMD=MMD, interval=interval)  
