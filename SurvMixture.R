@@ -1,11 +1,9 @@
-###混合物生存分析
 ###SurvMixture.R
 
 
 
 
 ####################################################数据预处理#############################################
-setwd("E:/BaiduNetdiskDownload/TAP数据")
 setwd("E:/TAPdata")
 cohort = read.csv("cohort_TAP_cokrige.csv", header=TRUE)
 cohort_pressure = cohort[, c("survpressureday","survpressure","TAP.cokrige.PM2.5.3","agg.cokrige.PM10.3","agg.cokrige.NO2.3","agg.cokrige.SO2.3","TAP.cokrige.O3.3","agg.cokrige.CO.3",                                             						                       
